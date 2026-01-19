@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Помощник подбора тарифов</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="page-title">
+  <h1>Помощник подбора тарифов</h1>
+  <p>Создайте компании и рассчитайте тарифы отдельно и в группе</p>
+</div>
+
+<div class="calculator">
+  <div class="form-row">
+    <label>Подключить группу компаний?</label>
+    <div class="group-toggle">
+      <button type="button" id="group-yes-btn" class="toggle-btn" data-value="yes">Да</button>
+      <button type="button" id="group-no-btn" class="toggle-btn selected" data-value="no">Нет</button>
+    </div>
+  </div>
+
+  <!-- Экран одиночного тарифа -->
+  <div id="screen-non-group" class="screen active">
+    <div class="form-row">
+      <label for="region-select">Регион</label>
+      <select id="region-select">
+        <option value="">Выберите регион</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Форма собственности</label>
+      <div class="btn-group">
+        <button type="button" id="ownership-ip-btn" class="toggle-btn" data-value="ip">ИП</button>
+        <button type="button" id="ownership-ul-btn" class="toggle-btn selected" data-value="ul">ЮЛ</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Срок тарифа</label>
+      <div class="btn-group">
+        <button type="button" id="duration1-btn" class="toggle-btn selected" data-value="1">1 год</button>
+        <button type="button" id="duration2-btn" class="toggle-btn" data-value="2">2 года</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <label for="employeeCount">Количество сотрудников</label>
+      <input type="number" id="employeeCount" min="0" value="1" />
+    </div>
+    <div class="total" id="nonGroupTotal">Итог: 0 ₽</div>
+    <button class="submit-btn" id="submitNonGroupBtn">Оформить</button>
+  </div>
+
+  <!-- Экран группового тарифа -->
+  <div id="screen-group" class="screen">
+    <div class="form-row">
+      <label>Компании</label>
+      <div id="companyContainer"></div>
+      <button type="button" id="addCompanyBtn" class="btn-secondary">Добавить компанию</button>
+    </div>
+
+    <div id="groupResults" class="total">Общий итог: 0 ₽</div>
+    <button class="submit-btn" id="submitGroupBtn">Оформить</button>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
