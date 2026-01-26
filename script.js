@@ -328,13 +328,48 @@ function getGroupColumnKey(count) {
 /**
  * ГЛОБАЛЬНЫЕ ФУНКЦИИ ОБНОВЛЕНИЯ
  */
-window.updateSolo = (f, v) => { STATE.solo[f] = f === 'employees' ? parseInt(v)||1 : v; calculate(); };
-window.addFastRow = () => { STATE.fastRows.push({id:Date.now(), region:'77', ulCount:1, ipCount:0}); render(); };
-window.updateFast = (id, f, v) => { const r = STATE.fastRows.find(x=>x.id==id); if(r) r[f] = f.includes('Count') ? (parseInt(v)||0) : v; calculate(); };
-window.removeFast = (id) => { if(STATE.fastRows.length > 1) { STATE.fastRows = STATE.fastRows.filter(x=>x.id!=id); render(); } };
-window.addDetailedCompany = () => { STATE.detailedCompanies.push({id:Date.now(), name:'', inn:'', region:'77', ownership:'ul', lk:'none', multiUser:'none'}); render(); };
-window.updateDet = (id, f, v, redraw = true) => { const c = STATE.detailedCompanies.find(x=>x.id==id); if(c) c[f] = v; if(redraw) render(); else calculate(); };
-window.removeDet = (id) => { if(STATE.detailedCompanies.length > 1) { STATE.detailedCompanies = STATE.detailedCompanies.filter(x=>x.id!=id); render(); } };
+window.updateSolo = (f, v) => { 
+    STATE.solo[f] = f === 'employees' ? parseInt(v)||1 : v; 
+    render(); // <--- Важно! Перерисовываем, чтобы класс 'selected' применился к нужной кнопке
+};
+
+window.addFastRow = () => { 
+    STATE.fastRows.push({id:Date.now(), region:'77', ulCount:1, ipCount:0}); 
+    render(); 
+};
+
+window.updateFast = (id, f, v) => { 
+    const r = STATE.fastRows.find(x=>x.id==id); 
+    if(r) r[f] = f.includes('Count') ? (parseInt(v)||0) : v; 
+    calculate(); // Здесь render не нужен, так как это просто ввод цифр в input
+};
+
+window.removeFast = (id) => { 
+    if(STATE.fastRows.length > 1) { 
+        STATE.fastRows = STATE.fastRows.filter(x=>x.id!=id); 
+        render(); 
+    } 
+};
+
+window.addDetailedCompany = () => { 
+    STATE.detailedCompanies.push({id:Date.now(), name:'', inn:'', region:'77', ownership:'ul', lk:'none', multiUser:'none'}); 
+    render(); 
+};
+
+// Убедитесь, что здесь redraw стоит true по умолчанию
+window.updateDet = (id, f, v, redraw = true) => { 
+    const c = STATE.detailedCompanies.find(x=>x.id==id); 
+    if(c) c[f] = v; 
+    if(redraw) render(); else calculate(); 
+};
+
+window.removeDet = (id) => { 
+    if(STATE.detailedCompanies.length > 1) { 
+        STATE.detailedCompanies = STATE.detailedCompanies.filter(x=>x.id!=id); 
+        render(); 
+    } 
+};
+
 window.toggleOption = (id, field, value) => { 
     const c = STATE.detailedCompanies.find(x=>x.id==id); 
     if(!c) return;
