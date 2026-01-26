@@ -115,3 +115,12 @@ input:focus { border-color: var(--brand); }
 @media print {
     body { margin: 0; }
 }
+.pdf-page {
+    width: 794px !important;
+    min-height: 1120px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: relative;
+    box-sizing: border-box;
+    display: block !important; /* Убеждаемся, что блоки видны */
+}
