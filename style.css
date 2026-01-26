@@ -1,165 +1,117 @@
 :root {
-  --brand-color: #FF5D5B;
-  --brand-color-hover: #e04a48;
-  --bg-color: #f9f9f9;
-  --text-color: #333;
-  --card-bg: #fff;
-  --border-color: #eee;
+  --brand: #FF5D5B;
+  --brand-hover: #e04a48;
+  --bg: #f4f6f9;
+  --text: #333;
+  --card-shadow: 0 10px 30px rgba(0,0,0,0.05);
 }
+
+* { box-sizing: border-box; }
 
 body {
-  margin: 0;
-  padding: 40px;
-  background: var(--bg-color);
-  font-family: Arial, sans-serif;
-  color: var(--text-color);
-}
-
-.page-title {
-  text-align: center;
-  margin-bottom: 24px;
-}
-.page-title h1 {
-  color: var(--brand-color);
+  margin: 0; padding: 20px;
+  background: var(--bg);
+  font-family: 'Montserrat', sans-serif;
+  color: var(--text);
+  line-height: 1.5;
 }
 
 .calculator {
-  max-width: 800px;
-  margin: auto;
-  padding: 32px;
-  background: var(--card-bg);
-  border-radius: 24px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  max-width: 800px; margin: auto; padding: 30px;
+  background: #fff; border-radius: 28px;
+  box-shadow: var(--card-shadow);
+}
+
+.page-title { text-align: center; margin-bottom: 30px; }
+.page-title h1 { color: var(--brand); font-weight: 800; font-size: 28px; margin: 0; }
+
+/* Адаптивная сетка */
+.grid-adaptive {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* 2 колонки на ПК */
+  gap: 15px;
+  margin-bottom: 15px;
 }
 
 .form-row { margin-bottom: 20px; }
-.form-row label {
-  font-weight: 600;
-  margin-bottom: 6px;
-  display: block;
-}
-select, input[type="number"] {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 14px;
-}
+.form-row label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
 
-.group-toggle, .btn-group {
-  display: flex;
-  gap: 10px;
+input, select {
+  width: 100%; padding: 12px 15px;
+  border: 1px solid #e1e8ed; border-radius: 12px;
+  font-family: inherit; font-size: 14px; outline: none;
+  transition: border-color 0.2s;
 }
+input:focus { border-color: var(--brand); }
+
+/* Кнопки переключатели */
+.toggle-group { display: flex; background: #f1f3f5; padding: 5px; border-radius: 14px; gap: 5px; }
 .toggle-btn {
-  flex: 1;
-  padding: 12px;
-  text-align: center;
-  font-weight: 600;
-  background: #fff;
-  border: 2px solid var(--border-color);
-  border-radius: 12px;
-  cursor: pointer;
+  flex: 1; border: 2px solid transparent; padding: 10px; border-radius: 10px;
+  cursor: pointer; font-weight: 600; font-family: inherit;
+  background: transparent; color: #7f8c8d; transition: all 0.2s;
 }
 .toggle-btn.selected {
-  background: var(--brand-color);
-  color: #fff;
-  border-color: var(--brand-color);
+  background: var(--brand); color: #fff; border-color: #fff;
+  box-shadow: 0 4px 10px rgba(255, 93, 91, 0.2);
 }
 
-.submit-btn, .btn-secondary {
-  width: 100%;
-  padding: 14px;
-  font-weight: 600;
-  text-align: center;
-  background: var(--brand-color);
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  margin-top: 10px;
-}
-.submit-btn:hover, .btn-secondary:hover {
-  background: var(--brand-color-hover);
+/* Карточки компаний */
+.company-card {
+  border: 1px solid #f0f0f0; padding: 20px; border-radius: 20px;
+  margin-bottom: 20px; position: relative; background: #fff;
 }
 
-.btn-secondary.small {
-  width: auto;
-  padding: 8px 14px;
-  font-size: 13px;
-  margin-top: 6px;
+/* Кнопки действий */
+.submit-btn {
+  width: 100%; padding: 16px; background: var(--brand); color: #fff;
+  border: 2px solid #fff; border-radius: 14px; font-weight: 700;
+  font-size: 16px; cursor: pointer; transition: 0.2s;
+}
+.submit-btn:hover { background: var(--brand-hover); transform: translateY(-1px); }
+
+.result-box {
+  margin-top: 25px; padding: 20px; background: #fff8f8;
+  border-radius: 16px; text-align: center;
+}
+.result-value { font-size: 32px; font-weight: 800; color: var(--brand); }
+
+/* МЕДИА-ЗАПРОСЫ ДЛЯ ТЕЛЕФОНОВ */
+@media (max-width: 600px) {
+  .grid-adaptive { grid-template-columns: 1fr; } /* Все в один столбец */
+  .calculator { padding: 20px; }
+  .toggle-btn { padding: 8px; font-size: 13px; }
 }
 
-.screen { display: none; }
-.screen.active { display: block; }
-
-.group-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.group-row select { flex: 2; }
-.group-row input[type="number"] { flex: 1; }
-.remove-row-btn {
-  background: transparent;
-  color: var(--brand-color);
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
+/* Блок информации о скидке под ценой */
+#discount-info {
+  font-size: 14px;
+  color: #27ae60;
+  margin-top: 8px;
+  cursor: help;
+  display: inline-block;
+  border-bottom: 1px dashed #27ae60;
+  transition: color 0.3s;
 }
 
-.region-header {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  font-weight: 600;
-  margin-bottom: 4px;
+#discount-info:hover {
+  color: #1e8449;
+  border-bottom-style: solid;
+}
+
+/* Настройка шрифта для предупреждения (минимум 3 орг) */
+.price-warning {
+  font-size: 22px !important;
   color: #999;
 }
 
-.total {
-  text-align: right;
-  font-weight: bold;
-  font-size: 1.1rem;
-  color: var(--brand-color);
-  margin-top: 6px;
+#pdf-template {
+    width: 794pt; /* или 210mm */
+    margin: 0 auto;
+    padding: 0;
+    box-sizing: border-box;
 }
-
-.company-card {
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 16px;
-  background: #fff;
-  margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.company-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.company-title {
-  font-weight: 600;
-  color: var(--brand-color);
-}
-
-.company-region-block {
-  margin-bottom: 10px;
-}
-
-.company-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.company-input {
-  flex: 1;
-  padding: 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 14px;
+/* Убираем любые системные отступы браузера при печати */
+@media print {
+    body { margin: 0; }
 }

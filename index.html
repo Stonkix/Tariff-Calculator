@@ -1,69 +1,96 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Помощник подбора тарифов</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Помощник подбора тарифов</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="page-title">
-  <h1>Помощник подбора тарифов</h1>
-  <p>Создайте компании и рассчитайте тарифы отдельно и в группе</p>
+    <div class="page-title">
+        <h1>Помощник подбора тарифов</h1>
+        <p style="text-align: center; color: #666; margin-top: 10px; font-weight: 500;">Рассчитайте стоимость подключения за несколько кликов</p>
+    </div>
+
+    <div class="calculator">
+        <div class="form-row">
+            <label>Подключить группу компаний?</label>
+            <div class="toggle-group" id="group-main-toggle">
+                <button type="button" class="toggle-btn selected" data-value="no">Нет</button>
+                <button type="button" class="toggle-btn" data-value="yes">Да</button>
+            </div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 25px 0;">
+
+        <div id="mode-selection-container" style="display: none;" class="form-row">
+            <label>Выберите режим расчета</label>
+            <div class="toggle-group">
+                <button type="button" class="tab-btn toggle-btn selected" data-mode="fast">Быстрый</button>
+                <button type="button" class="tab-btn toggle-btn" data-mode="detailed">Подробный</button>
+                <button type="button" class="tab-btn toggle-btn" data-mode="addon">Подключение</button>
+            </div>
+        </div>
+
+        <div id="dynamic-fields"></div>
+
+        <div class="details-area" style="margin-top: 25px; padding: 15px; background: #fcfcfc; border-radius: 12px; border-left: 4px solid #FF5D5B;">
+            <div style="font-weight: 700; font-size: 11px; margin-bottom: 5px; color: #999; text-transform: uppercase; letter-spacing: 0.5px;">Детализация:</div>
+            <div id="details-content" style="font-size: 14px; white-space: pre-line; color: #444; line-height: 1.6;">Введите данные для расчета...</div>
+        </div>
+
+        <div class="result-box" style="margin-top: 25px; padding: 25px; background: #fff8f8; border-radius: 20px; text-align: center; border: 1px solid rgba(255, 93, 91, 0.1);">
+            <div style="font-weight: 600; color: #666; margin-bottom: 5px; font-size: 14px;">Итоговая стоимость:</div>
+            <div id="total-price" style="font-size: 36px; font-weight: 800; color: #FF5D5B; margin-bottom: 20px;">0 ₽</div>
+            <button type="button" class="submit-btn">Оформить заявку</button>
+            <button id="generate-pdf" class="submit-btn" style="margin-top: 20px; background-color: #27ae60;">
+                Оформить заявку (Скачать КП)
+            </button>
+        </div>
+    </div>
+<div id="pdf-container-wrapper" style="display: none; width: 100%; background: #525659;">
+    <div id="pdf-template" style="width: 794px; background: white; margin: 0 auto; padding: 0; box-sizing: border-box;">
+        
+        <div id="page-1" class="pdf-page" style="width: 794px; height: 1120px; overflow: hidden; background: white; margin: 0; padding: 0;">
+            <img src="image_f4c855.jpg" style="width: 100%; display: block; border: none;">
+            <div id="content-p1" style="padding: 0 50px; margin-top: -30px;"> <h2 style="color: #FF5D5B; font-size: 18px; margin: 0 0 10px 0; font-family: sans-serif;">Стоимость:</h2>
+                <div id="table-container-p1">
+                    <table style="width: 100%; border-collapse: collapse; font-family: sans-serif;">
+                        <tbody id="pdf-rows"></tbody>
+                    </table>
+                </div>
+                <div id="res-place-p1" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+
+        <div id="page-2" class="pdf-page" style="width: 794px; height: 1120px; padding: 40px 50px; background: white; box-sizing: border-box; display: none; margin: 0;">
+            <h2 style="color: #FF5D5B; font-size: 18px; margin: 0 0 10px 0; font-family: sans-serif;">Продолжение расчёта:</h2>
+            <div id="table-container-p2">
+                <table style="width: 100%; border-collapse: collapse; font-family: sans-serif;">
+                    <tbody id="pdf-rows-p2"></tbody>
+                </table>
+            </div>
+            <div id="res-place-p2" style="margin-top: 15px;"></div>
+        </div>
+
+        <div id="page-last" class="pdf-page" style="width: 794px; height: 1120px; background: white; margin: 0; padding: 0;">
+            <img src="image_f4c793.jpg" style="width: 100%; display: block; border: none;">
+        </div>
+
+    </div>
 </div>
 
-<div class="calculator">
-  <div class="form-row">
-    <label>Подключить группу компаний?</label>
-    <div class="group-toggle">
-      <button type="button" id="group-yes-btn" class="toggle-btn" data-value="yes">Да</button>
-      <button type="button" id="group-no-btn" class="toggle-btn selected" data-value="no">Нет</button>
-    </div>
-  </div>
-
-  <!-- Экран одиночного тарифа -->
-  <div id="screen-non-group" class="screen active">
-    <div class="form-row">
-      <label for="region-select">Регион</label>
-      <select id="region-select">
-        <option value="">Выберите регион</option>
-      </select>
-    </div>
-    <div class="form-row">
-      <label>Форма собственности</label>
-      <div class="btn-group">
-        <button type="button" id="ownership-ip-btn" class="toggle-btn" data-value="ip">ИП</button>
-        <button type="button" id="ownership-ul-btn" class="toggle-btn selected" data-value="ul">ЮЛ</button>
-      </div>
-    </div>
-    <div class="form-row">
-      <label>Срок тарифа</label>
-      <div class="btn-group">
-        <button type="button" id="duration1-btn" class="toggle-btn selected" data-value="1">1 год</button>
-        <button type="button" id="duration2-btn" class="toggle-btn" data-value="2">2 года</button>
-      </div>
-    </div>
-    <div class="form-row">
-      <label for="employeeCount">Количество сотрудников</label>
-      <input type="number" id="employeeCount" min="0" value="1" />
-    </div>
-    <div class="total" id="nonGroupTotal">Итог: 0 ₽</div>
-    <button class="submit-btn" id="submitNonGroupBtn">Оформить</button>
-  </div>
-
-  <!-- Экран группового тарифа -->
-  <div id="screen-group" class="screen">
-    <div class="form-row">
-      <label>Компании</label>
-      <div id="companyContainer"></div>
-      <button type="button" id="addCompanyBtn" class="btn-secondary">Добавить компанию</button>
-    </div>
-
-    <div id="groupResults" class="total">Общий итог: 0 ₽</div>
-    <button class="submit-btn" id="submitGroupBtn">Оформить</button>
-  </div>
+<div id="summary-block" style="display: none; background: #ffdbdb; padding: 15px 20px; border-radius: 12px; text-align: center; font-family: sans-serif;">
+    <span style="font-size: 13px; color: #333;">Стоимость для вас:</span>
+    <div id="pdf-total" style="font-size: 24px; font-weight: 700; color: #FF5D5B;"></div>
+    <p id="pdf-discount" style="color: #27ae60; font-weight: 700; margin: 3px 0 0 0; font-size: 11px;"></p>
 </div>
-
-<script src="script.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
