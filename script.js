@@ -367,7 +367,7 @@ document.getElementById('generate-pdf').onclick = function() {
         const contact2 = contact1.cloneNode(true);
 
         const finalImg = document.createElement('img');
-        finalImg.src = "image_f4c793.jpg";
+        finalImg.src = "pdf-footer.jpg";
         finalImg.style = "width:100%; display:block; margin-top: 15px; page-break-inside: avoid;";
         finalImg.classList.add('pdf-dynamic-el');
 
