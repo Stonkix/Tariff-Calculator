@@ -99,32 +99,33 @@ function render() {
 }
 
 function renderSoloMode(container) {
-    container.innerHTML = `
-        <div class="form-row"><label>Регион</label><select id="s-reg">${getRegionOptions(STATE.solo.region)}</select></div>
-        <div class="grid-adaptive" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <div><label>Тип</label><div class="toggle-group">
-                <button class="toggle-btn ${STATE.solo.ownership==='ul'?'selected':''}" onclick="updateSolo('ownership','ul')">ЮЛ</button>
-                <button class="toggle-btn ${STATE.solo.ownership==='ip'?'selected':''}" onclick="updateSolo('ownership','ip')">ИП</button>
-            </div></div>
-            <div><label>Срок</label><div class="toggle-group">
-                <button class="toggle-btn ${STATE.solo.duration==='1'?'selected':''}" onclick="updateSolo('duration','1')">1 год</button>
-                <button class="toggle-btn ${STATE.solo.duration==='2'?'selected':''}" onclick="updateSolo('duration','2')">2 года</button>
-            </div></div>
-        </div>
-        <div class="form-row" style="margin-top:15px;">
-            <label>Сотрудников с сертификатом:</label>
-            <input type="number" value="${STATE.solo.employees}" min="1" oninput="updateSolo('employees', this.value)">
-        </div>`;
-    document.getElementById('s-reg').onchange = (e) => updateSolo('region', e.target.value);
+    const tpl = document.getElementById('tpl-solo-mode').content.cloneNode(true);
+    
+    const regSelect = tpl.getElementById('s-reg');
+    regSelect.innerHTML = getRegionOptions(STATE.solo.region);
+    regSelect.onchange = (e) => updateSolo('region', e.target.value);
+
+    // Подсветка кнопок
+    tpl.querySelectorAll('#solo-ownership .toggle-btn').forEach(b => {
+        if(b.dataset.val === STATE.solo.ownership) b.classList.add('selected');
+        b.onclick = () => updateSolo('ownership', b.dataset.val);
+    });
+
+    tpl.querySelectorAll('#solo-duration .toggle-btn').forEach(b => {
+        if(b.dataset.val === STATE.solo.duration) b.classList.add('selected');
+        b.onclick = () => updateSolo('duration', b.dataset.val);
+    });
+
+    const empInput = tpl.getElementById('solo-employees');
+    empInput.value = STATE.solo.employees;
+    empInput.oninput = (e) => updateSolo('employees', e.target.value);
+
+    container.appendChild(tpl);
 }
 
 function renderFastGroupMode(container) {
-    container.innerHTML = `
-        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 40px; gap: 10px; margin-bottom: 5px; opacity: 0.6; font-size: 11px; font-weight: 700;">
-            <div>РЕГИОН</div><div style="text-align:center">ЮЛ</div><div style="text-align:center">ИП</div><div></div>
-        </div>
-        <div id="f-rows"></div>
-        <button class="submit-btn" style="background:#FF5D5B; margin-top:10px;" onclick="addFastRow()">+ Добавить регион</button>`;
+    const tpl = document.getElementById('tpl-fast-mode').content.cloneNode(true);
+    const rowsCont = tpl.getElementById('f-rows');
 
     STATE.fastRows.forEach(row => {
         const div = document.createElement('div');
@@ -134,66 +135,75 @@ function renderFastGroupMode(container) {
             <input type="number" value="${row.ulCount}" oninput="window.updateFast(${row.id},'ulCount',this.value)" style="text-align: center;">
             <input type="number" value="${row.ipCount}" oninput="window.updateFast(${row.id},'ipCount',this.value)" style="text-align: center;">
             <button onclick="window.removeFast(${row.id})" style="color:#ccc; background:none; border:none; font-size:24px; cursor:pointer;">&times;</button>`;
-        document.getElementById('f-rows').appendChild(div);
+        rowsCont.appendChild(div);
     });
+    container.appendChild(tpl);
 }
 
 function renderDetailedMode(container, showExisting) {
-    let html = showExisting ? `
-        <div class="form-row" style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #eee;">
-            <label>Уже подключено компаний в ГК</label>
-            <input type="number" min="0" value="${STATE.existingCount}" style="width: 100px; text-align: center;" oninput="let v=parseInt(this.value)||0; if(v<0) v=0; STATE.existingCount=v; this.value=v; calculate()">
-        </div>` : '';
-    html += `<div id="det-cards"></div><button class="submit-btn" style="background: #FF5D5B;" onclick="addDetailedCompany()">+ Добавить компанию</button>`;
-    container.innerHTML = html;
+    const mainTpl = document.getElementById('tpl-detailed-mode').content.cloneNode(true);
+    
+    // 1. Обработка блока "Уже подключено"
+    if (showExisting) {
+        mainTpl.getElementById('existing-count-row').style.display = 'flex';
+        const inp = mainTpl.getElementById('existing-input');
+        inp.value = STATE.existingCount;
+        inp.oninput = (e) => { STATE.existingCount = parseInt(e.target.value) || 0; calculate(); };
+    }
 
-    const cardsContainer = document.getElementById('det-cards');
+    const cardsContainer = mainTpl.getElementById('det-cards');
 
+    // 2. Цикл по компаниям с использованием шаблона карточки
     STATE.detailedCompanies.forEach((comp, idx) => {
-        const isInnValid = comp.inn.length === 0 || comp.inn.length === 10 || comp.inn.length === 12;
-        const innBorder = isInnValid ? '' : 'border-color: red; color: red;';
+        const cardTpl = document.getElementById('tpl-company-card').content.cloneNode(true);
+        const cardDiv = cardTpl.querySelector('.company-card');
 
-        const card = document.createElement('div');
-        card.className = 'company-card';
-        card.style = "background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.05);";
-        
-        // Создаем элементы через innerHTML, но само ЗНАЧЕНИЕ (value) названия будем ставить отдельно через свойство .value
-        card.innerHTML = `
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
-                <input type="text" class="comp-name-input" placeholder="Название компании">
-                <input type="text" placeholder="ИНН" style="${innBorder}" value="${comp.inn}" oninput="window.updateDet(${comp.id},'inn',this.value,false)">
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-                <select onchange="window.updateDet(${comp.id},'region',this.value)">${getRegionOptions(comp.region)}</select>
-                <div class="toggle-group">
-                    <button class="toggle-btn ${comp.ownership == 'ul' ? 'selected' : ''}" onclick="window.updateDet(${comp.id},'ownership','ul')">ЮЛ</button>
-                    <button class="toggle-btn ${comp.ownership == 'ip' ? 'selected' : ''}" onclick="window.updateDet(${comp.id},'ownership','ip')">ИП</button>
-                </div>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div><div style="font-size: 10px; color: #999; margin-bottom: 4px; font-weight: 700;">ЛИЧНЫЙ КАБИНЕТ</div>
-                    <div class="toggle-group">
-                        <button class="toggle-btn ${comp.lk=='base'?'selected':''}" onclick="window.toggleOption(${comp.id},'lk','base')">Базовый</button>
-                        <button class="toggle-btn ${comp.lk=='prof'?'selected':''}" onclick="window.toggleOption(${comp.id},'lk','prof')">Проф</button>
-                    </div>
-                </div>
-                <div><div style="font-size: 10px; color: #999; margin-bottom: 4px; font-weight: 700;">МНОГОПОЛЬЗ. РЕЖИМ</div>
-                    <div class="toggle-group">
-                        <button class="toggle-btn ${comp.multiUser=='small'?'selected':''}" onclick="window.toggleOption(${comp.id},'multiUser','small')">2-9</button>
-                        <button class="toggle-btn ${comp.multiUser=='large'?'selected':''}" onclick="window.toggleOption(${comp.id},'multiUser','large')">10+</button>
-                    </div>
-                </div>
-            </div>
-            ${idx > 0 ? `<button onclick="window.removeDet(${comp.id})" style="position:absolute; top: -10px; right: -10px; background: #fff; border: 1px solid #eee; border-radius: 50%; width: 24px; height: 24px; color: red; cursor: pointer;">&times;</button>` : ''}
-        `;
+        // Поле названия (безопасная установка)
+        const nameInp = cardTpl.querySelector('.comp-name-input');
+        nameInp.value = comp.name;
+        nameInp.oninput = (e) => window.updateDet(comp.id, 'name', e.target.value, false);
 
-        // Безопасная установка названия, которая не боится кавычек
-        const nameInput = card.querySelector('.comp-name-input');
-        nameInput.value = comp.name;
-        nameInput.oninput = (e) => window.updateDet(comp.id, 'name', e.target.value, false);
+        // Поле ИНН
+        const innInp = cardTpl.querySelector('.comp-inn-input');
+        innInp.value = comp.inn;
+        innInp.style.borderColor = (comp.inn.length === 0 || [10, 12].includes(comp.inn.length)) ? '' : 'red';
+        innInp.oninput = (e) => window.updateDet(comp.id, 'inn', e.target.value, false);
 
-        cardsContainer.appendChild(card);
+        // Селект региона
+        const regSel = cardTpl.querySelector('.comp-region-select');
+        regSel.innerHTML = getRegionOptions(comp.region);
+        regSel.onchange = (e) => window.updateDet(comp.id, 'region', e.target.value);
+
+        // Кнопки ЮЛ/ИП
+        cardTpl.querySelectorAll('.ownership-group .toggle-btn').forEach(btn => {
+            if (btn.dataset.val === comp.ownership) btn.classList.add('selected');
+            btn.onclick = () => window.updateDet(comp.id, 'ownership', btn.dataset.val);
+        });
+
+        // Кнопки ЛК
+        cardTpl.querySelectorAll('.lk-group .toggle-btn').forEach(btn => {
+            if (btn.dataset.val === comp.lk) btn.classList.add('selected');
+            btn.onclick = () => window.toggleOption(comp.id, 'lk', btn.dataset.val);
+        });
+
+        // Кнопки Многопользовательского режима
+        cardTpl.querySelectorAll('.multi-group .toggle-btn').forEach(btn => {
+            if (btn.dataset.val === comp.multiUser) btn.classList.add('selected');
+            btn.onclick = () => window.toggleOption(comp.id, 'multiUser', btn.dataset.val);
+        });
+
+        // Кнопка удаления (показываем только если карточек больше одной)
+        if (idx > 0) {
+            const delBtn = cardTpl.querySelector('.remove-card-btn');
+            delBtn.style.display = 'block';
+            delBtn.onclick = () => window.removeDet(comp.id);
+        }
+
+        cardsContainer.appendChild(cardTpl);
     });
+
+    container.innerHTML = ''; // Очищаем контейнер перед вставкой
+    container.appendChild(mainTpl);
 }
 
 /**
