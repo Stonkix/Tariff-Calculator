@@ -41,6 +41,17 @@
             <div id="details-content" style="font-size: 14px; white-space: pre-line; color: #444; line-height: 1.6;">Введите данные для расчета...</div>
         </div>
 
+        <div style="margin-top: 20px; padding: 15px; background: #fff; border: 1px solid #eee; border-radius: 12px; display: flex; align-items: center; justify-content: space-between;">
+            <label style="font-weight: 600; font-size: 14px; margin-right: 10px;">Дополнительная скидка:</label>
+            <div style="display: flex; gap: 10px; flex: 1; max-width: 320px;">
+                <select id="manual-disc-type" style="width: 140px;">
+                    <option value="percent">Процент %</option>
+                    <option value="rub">Рубли ₽</option>
+                </select>
+                <input type="number" id="manual-disc-val" placeholder="0" min="0" style="flex: 1; text-align: center;">
+            </div>
+        </div>
+
         <div class="result-box" style="margin-top: 25px; padding: 25px; background: #fff8f8; border-radius: 20px; text-align: center; border: 1px solid rgba(255, 93, 91, 0.1);">
             <div style="font-weight: 600; color: #666; margin-bottom: 5px; font-size: 14px;">Итоговая стоимость:</div>
             <div id="total-price" style="font-size: 36px; font-weight: 800; color: #FF5D5B; margin-bottom: 15px;">0 ₽</div>

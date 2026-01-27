@@ -2,19 +2,23 @@
  * КОНФИГУРАЦИЯ И СОСТОЯНИЕ
  */
 const STATE = {
-  tariffs: [],
-  isGroup: false,
-  mode: 'fast', 
-  existingCount: 0,
-  solo: { region: '77', ownership: 'ul', duration: '1', employees: 1 },
-  fastRows: [{ id: Date.now(), region: '77', ulCount: 1, ipCount: 0 }],
-  detailedCompanies: [{ id: Date.now(), name: '', inn: '', region: '77', ownership: 'ul', lk: 'none', multiUser: 'none' }]
+    tariffs: [],
+    isGroup: false,
+    mode: 'fast', 
+    existingCount: 0,
+    solo: { region: '', ownership: 'ul', duration: '1', employees: 1 },
+    fastRows: [{ id: Date.now(), region: '', ulCount: 1, ipCount: 0 }],
+    detailedCompanies: [{ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none' }],
+    manualDiscount: { type: 'percent', value: 0 }
 };
 
 const formatPrice = (v) => Math.round(v).toLocaleString('ru-RU') + ' ₽';
 
-const getRegionOptions = (selected) => 
-  STATE.tariffs.map(t => `<option value="${t.Код}" ${selected == t.Код ? 'selected' : ''}>${t.Регион}</option>`).join('');
+const getRegionOptions = (selected) => {
+    let options = `<option value="" ${!selected ? 'selected' : ''} disabled>Выберите регион</option>`;
+    options += STATE.tariffs.map(t => `<option value="${t.Код}" ${selected == t.Код ? 'selected' : ''}>${t.Регион}</option>`).join('');
+    return options;
+};
 
 /**
  * ИНИЦИАЛИЗАЦИЯ
@@ -27,6 +31,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById(id).oninput = (e) => localStorage.setItem(`p-${id}`, e.target.value);
     });
 
+    const discType = document.getElementById('manual-disc-type');
+    const discVal = document.getElementById('manual-disc-val');
+    
+    discType.onchange = (e) => {
+        STATE.manualDiscount.type = e.target.value;
+        validateManualDiscount(discVal);
+        calculate();
+    };
+
+    discVal.oninput = (e) => {
+        validateManualDiscount(e.target);
+        STATE.manualDiscount.value = parseFloat(e.target.value) || 0;
+        calculate();
+    };
+
     try {
         const res = await fetch('Цены для Калькулятора 1СО.json');
         const data = await res.json();
@@ -35,6 +54,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         render();
     } catch (e) { console.error("Ошибка загрузки данных:", e); }
 });
+
+function validateManualDiscount(input) {
+    if (STATE.manualDiscount.type === 'percent') {
+        let val = parseFloat(input.value);
+        if (val < 0) input.value = 0;
+        if (val > 100) input.value = 100;
+    }
+}
 
 function setupEventListeners() {
     document.querySelectorAll('#group-main-toggle .toggle-btn').forEach(btn => {
@@ -92,40 +119,80 @@ function renderSoloMode(container) {
 }
 
 function renderFastGroupMode(container) {
-    container.innerHTML = `<div id="f-rows"></div><button class="submit-btn" style="background:#FF5D5B; margin-top:10px;" onclick="addFastRow()">+ Добавить регион</button>`;
+    container.innerHTML = `
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 40px; gap: 10px; margin-bottom: 5px; opacity: 0.6; font-size: 11px; font-weight: 700;">
+            <div>РЕГИОН</div><div style="text-align:center">ЮЛ</div><div style="text-align:center">ИП</div><div></div>
+        </div>
+        <div id="f-rows"></div>
+        <button class="submit-btn" style="background:#FF5D5B; margin-top:10px;" onclick="addFastRow()">+ Добавить регион</button>`;
+
     STATE.fastRows.forEach(row => {
         const div = document.createElement('div');
         div.style = "display: grid; grid-template-columns: 2fr 1fr 1fr 40px; gap: 10px; margin-bottom: 8px; align-items: center;";
         div.innerHTML = `
             <select onchange="window.updateFast(${row.id},'region',this.value)">${getRegionOptions(row.region)}</select>
-            <input type="number" value="${row.ulCount}" oninput="window.updateFast(${row.id},'ulCount',this.value)" placeholder="ЮЛ">
-            <input type="number" value="${row.ipCount}" oninput="window.updateFast(${row.id},'ipCount',this.value)" placeholder="ИП">
+            <input type="number" value="${row.ulCount}" oninput="window.updateFast(${row.id},'ulCount',this.value)" style="text-align: center;">
+            <input type="number" value="${row.ipCount}" oninput="window.updateFast(${row.id},'ipCount',this.value)" style="text-align: center;">
             <button onclick="window.removeFast(${row.id})" style="color:#ccc; background:none; border:none; font-size:24px; cursor:pointer;">&times;</button>`;
         document.getElementById('f-rows').appendChild(div);
     });
 }
 
 function renderDetailedMode(container, showExisting) {
-    let html = showExisting ? `<div class="form-row" style="margin-bottom:20px;"><label>Уже подключено в ГК</label><input type="number" value="${STATE.existingCount}" oninput="STATE.existingCount=parseInt(this.value)||0; calculate()"></div>` : '';
-    html += `<div id="det-cards"></div><button class="submit-btn" style="background:#FF5D5B;" onclick="addDetailedCompany()">+ Добавить компанию</button>`;
+    let html = showExisting ? `
+        <div class="form-row" style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #eee;">
+            <label>Уже подключено компаний в ГК</label>
+            <input type="number" min="0" value="${STATE.existingCount}" style="width: 100px; text-align: center;" oninput="let v=parseInt(this.value)||0; if(v<0) v=0; STATE.existingCount=v; this.value=v; calculate()">
+        </div>` : '';
+    html += `<div id="det-cards"></div><button class="submit-btn" style="background: #FF5D5B;" onclick="addDetailedCompany()">+ Добавить компанию</button>`;
     container.innerHTML = html;
-    STATE.detailedCompanies.forEach((comp) => {
+
+    const cardsContainer = document.getElementById('det-cards');
+
+    STATE.detailedCompanies.forEach((comp, idx) => {
+        const isInnValid = comp.inn.length === 0 || comp.inn.length === 10 || comp.inn.length === 12;
+        const innBorder = isInnValid ? '' : 'border-color: red; color: red;';
+
         const card = document.createElement('div');
         card.className = 'company-card';
-        card.style = "background:#fff; border:1px solid #eee; border-radius:12px; padding:15px; margin-bottom:15px; position:relative;";
+        card.style = "background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.05);";
+        
+        // Создаем элементы через innerHTML, но само ЗНАЧЕНИЕ (value) названия будем ставить отдельно через свойство .value
         card.innerHTML = `
-            <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px; margin-bottom:10px;">
-                <input type="text" placeholder="Название" value="${comp.name}" oninput="window.updateDet(${comp.id},'name',this.value,false)">
-                <input type="text" placeholder="ИНН" value="${comp.inn}" oninput="window.updateDet(${comp.id},'inn',this.value,false)">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <input type="text" class="comp-name-input" placeholder="Название компании">
+                <input type="text" placeholder="ИНН" style="${innBorder}" value="${comp.inn}" oninput="window.updateDet(${comp.id},'inn',this.value,false)">
             </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
                 <select onchange="window.updateDet(${comp.id},'region',this.value)">${getRegionOptions(comp.region)}</select>
                 <div class="toggle-group">
-                    <button class="toggle-btn ${comp.ownership=='ul'?'selected':''}" onclick="window.updateDet(${comp.id},'ownership','ul')">ЮЛ</button>
-                    <button class="toggle-btn ${comp.ownership=='ip'?'selected':''}" onclick="window.updateDet(${comp.id},'ownership','ip')">ИП</button>
+                    <button class="toggle-btn ${comp.ownership == 'ul' ? 'selected' : ''}" onclick="window.updateDet(${comp.id},'ownership','ul')">ЮЛ</button>
+                    <button class="toggle-btn ${comp.ownership == 'ip' ? 'selected' : ''}" onclick="window.updateDet(${comp.id},'ownership','ip')">ИП</button>
                 </div>
-            </div>`;
-        document.getElementById('det-cards').appendChild(card);
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><div style="font-size: 10px; color: #999; margin-bottom: 4px; font-weight: 700;">ЛИЧНЫЙ КАБИНЕТ</div>
+                    <div class="toggle-group">
+                        <button class="toggle-btn ${comp.lk=='base'?'selected':''}" onclick="window.toggleOption(${comp.id},'lk','base')">Базовый</button>
+                        <button class="toggle-btn ${comp.lk=='prof'?'selected':''}" onclick="window.toggleOption(${comp.id},'lk','prof')">Проф</button>
+                    </div>
+                </div>
+                <div><div style="font-size: 10px; color: #999; margin-bottom: 4px; font-weight: 700;">МНОГОПОЛЬЗ. РЕЖИМ</div>
+                    <div class="toggle-group">
+                        <button class="toggle-btn ${comp.multiUser=='small'?'selected':''}" onclick="window.toggleOption(${comp.id},'multiUser','small')">2-9</button>
+                        <button class="toggle-btn ${comp.multiUser=='large'?'selected':''}" onclick="window.toggleOption(${comp.id},'multiUser','large')">10+</button>
+                    </div>
+                </div>
+            </div>
+            ${idx > 0 ? `<button onclick="window.removeDet(${comp.id})" style="position:absolute; top: -10px; right: -10px; background: #fff; border: 1px solid #eee; border-radius: 50%; width: 24px; height: 24px; color: red; cursor: pointer;">&times;</button>` : ''}
+        `;
+
+        // Безопасная установка названия, которая не боится кавычек
+        const nameInput = card.querySelector('.comp-name-input');
+        nameInput.value = comp.name;
+        nameInput.oninput = (e) => window.updateDet(comp.id, 'name', e.target.value, false);
+
+        cardsContainer.appendChild(card);
     });
 }
 
@@ -133,7 +200,11 @@ function renderDetailedMode(container, showExisting) {
  * ЛОГИКА РАСЧЕТОВ
  */
 function calculate() {
-    let total = 0, baseTotal = 0, logs = [];
+    let total = 0; 
+    let discountableBaseTotal = 0; 
+    let discountableTotal = 0;     
+
+    let logs = [];
     const ui = { price: document.getElementById('total-price'), details: document.getElementById('details-content'), discount: document.getElementById('discount-info') };
 
     if (!STATE.isGroup) {
@@ -141,9 +212,20 @@ function calculate() {
         const t = STATE.tariffs.find(x => x.Код == STATE.solo.region);
         if (t) {
             const isTwo = STATE.solo.duration === '2';
+            const typeLabel = STATE.solo.ownership === 'ul' ? 'ЮЛ' : 'ИП';
             const p = (STATE.solo.ownership === 'ul') ? (isTwo ? t.Column4 : t.ЮЛ) : (isTwo ? t.Column13 : t.ИП);
             total += parseInt(p) || 0;
-            logs.push(`Лицензия ${STATE.solo.ownership.toUpperCase()}, ${t.Регион}, ${isTwo?'2 года':'1 год'} | ${formatPrice(p)}`);
+            logs.push(`Лицензия ${typeLabel}, ${t.Регион}, ${isTwo?'2 года':'1 год'} | ${formatPrice(p)}`);
+
+            if (STATE.solo.employees >= 2 && STATE.solo.employees <= 9) {
+                const pMulti = parseInt(t['Многопользовательский режим']) || 0;
+                total += pMulti;
+                logs.push(`Многопользовательский режим (2-9 чел) | ${formatPrice(pMulti)}`);
+            } else if (STATE.solo.employees >= 10) {
+                const pMulti = parseInt(t['Column29']) || 0;
+                total += pMulti;
+                logs.push(`Многопользовательский режим (10+ чел) | ${formatPrice(pMulti)}`);
+            }
         }
     } else {
         const count = (STATE.mode === 'addon' ? STATE.existingCount : 0) + 
@@ -160,27 +242,65 @@ function calculate() {
             STATE.fastRows.forEach(r => {
                 const t = STATE.tariffs.find(x => x.Код == r.region); if (!t) return;
                 const pUL = parseInt(t[col.ul]) || 0, pIP = parseInt(t[col.ip]) || 0;
+                const baseUL = parseInt(t.ЮЛ) || 0, baseIP = parseInt(t.ИП) || 0;
+
                 if (r.ulCount > 0) { 
-                    const sum = pUL * r.ulCount; total += sum; baseTotal += (parseInt(t.ЮЛ)*r.ulCount);
+                    const sum = pUL * r.ulCount; 
+                    total += sum; 
+                    discountableTotal += sum;
+                    discountableBaseTotal += baseUL * r.ulCount;
                     logs.push(`ЮЛ (${t.Регион}) | ${formatPrice(pUL)} x ${r.ulCount} | ${formatPrice(sum)}`); 
                 }
                 if (r.ipCount > 0) { 
-                    const sum = pIP * r.ipCount; total += sum; baseTotal += (parseInt(t.ИП)*r.ipCount);
+                    const sum = pIP * r.ipCount; 
+                    total += sum;
+                    discountableTotal += sum;
+                    discountableBaseTotal += baseIP * r.ipCount;
                     logs.push(`ИП (${t.Регион}) | ${formatPrice(pIP)} x ${r.ipCount} | ${formatPrice(sum)}`); 
                 }
             });
         } else {
             STATE.detailedCompanies.forEach(c => {
                 const t = STATE.tariffs.find(x => x.Код == c.region); if (!t) return;
+                const typeLabel = c.ownership === 'ul' ? 'ЮЛ' : 'ИП';
                 const pGK = parseInt(t[c.ownership === 'ul' ? col.ul : col.ip]) || 0;
-                total += pGK; baseTotal += parseInt(c.ownership === 'ul' ? t.ЮЛ : t.ИП) || 0;
-                logs.push(`${c.name || 'Орг'} (${t.Регион}) | ${formatPrice(pGK)}`);
+                const pBase = parseInt(c.ownership === 'ul' ? t.ЮЛ : t.ИП) || 0;
+                const compName = c.name || 'Орг';
+                
+                // Добавляем лицензию ПЕРВОЙ в список для компании
+                logs.push(`${compName} (${typeLabel}, ${t.Регион}) | ${formatPrice(pGK)}`);
+
+                total += pGK;
+                discountableTotal += pGK;
+                discountableBaseTotal += pBase;
+                
+                // Допы теперь с отступом (в интерфейсе)
+                if (c.lk === 'base') { total += 600; logs.push(`      ${compName} - ЛК Базовый | ${formatPrice(600)}`); }
+                if (c.lk === 'prof') { total += 900; logs.push(`      ${compName} - ЛК Проф | ${formatPrice(900)}`); }
+                if (c.multiUser === 'small') { total += 1620; logs.push(`      ${compName} - Многопольз. (2-9) | ${formatPrice(1620)}`); }
+                if (c.multiUser === 'large') { total += 3240; logs.push(`      ${compName} - Многопольз. (10+) | ${formatPrice(3240)}`); }
             });
         }
-        const pct = Math.round(((baseTotal - total) / baseTotal) * 100);
-        ui.discount.innerHTML = `Ваша скидка составила: ${pct}% ⓘ`;
+        
+        const pct = discountableBaseTotal > 0 ? Math.round(((discountableBaseTotal - discountableTotal) / discountableBaseTotal) * 100) : 0;
+        ui.discount.innerHTML = `Скидка ГК: ${pct}% ⓘ`;
     }
-    ui.price.textContent = formatPrice(total); ui.details.innerText = logs.join('\n');
+
+    let finalTotal = total;
+    if (STATE.manualDiscount.value > 0) {
+        let discAmount = 0;
+        if (STATE.manualDiscount.type === 'percent') {
+            discAmount = total * (STATE.manualDiscount.value / 100);
+            logs.push(`Доп. скидка ${STATE.manualDiscount.value}% | -${formatPrice(discAmount)}`);
+        } else {
+            discAmount = STATE.manualDiscount.value;
+            logs.push(`Доп. скидка (руб) | -${formatPrice(discAmount)}`);
+        }
+        finalTotal = Math.max(0, total - discAmount);
+    }
+
+    ui.price.textContent = formatPrice(finalTotal); 
+    ui.details.innerText = logs.join('\n');
 }
 
 function getGroupColumnKey(n) {
@@ -215,14 +335,11 @@ document.getElementById('generate-pdf').onclick = function() {
         const page2 = document.getElementById('page-2');
         const pageLast = document.getElementById('page-last');
 
-        // Сохраняем копии страниц, чтобы вернуть их в HTML после генерации
         const page2Copy = page2.cloneNode(true);
         const pageLastCopy = pageLast.cloneNode(true);
 
-        // 1. Полная очистка динамики
         document.querySelectorAll('.pdf-dynamic-el').forEach(el => el.remove());
         
-        // 2. Подготовка блоков
         const summary = createPdfBlock('summary-block');
         summary.querySelector('.pdf-total-val').innerText = document.getElementById('total-price').innerText;
         
@@ -244,24 +361,25 @@ document.getElementById('generate-pdf').onclick = function() {
         finalImg.style = "width:100%; display:block; margin-top: 15px; page-break-inside: avoid;";
         finalImg.classList.add('pdf-dynamic-el');
 
-        // 3. Распределение строк
+        // В PDF убираем отступы (trim) чтобы сохранить исходный вид
         const lines = document.getElementById('details-content').innerText.split('\n').filter(l => l.trim());
         const rows1 = document.getElementById('pdf-rows');
-        const rows2 = page2.querySelector('#pdf-rows-p2'); // Ищем внутри текущей страницы
+        const rows2 = page2.querySelector('#pdf-rows-p2');
         
         rows1.innerHTML = ''; 
         if (rows2) rows2.innerHTML = '';
 
         lines.forEach((line, idx) => {
+            const cleanLine = line.trim(); // Очистка отступов для PDF
             const tr = document.createElement('tr');
-            if (line.includes('|')) {
-                const parts = line.split('|');
+            if (cleanLine.includes('|')) {
+                const parts = cleanLine.split('|');
                 const t = parts.length > 2 ? parts[0] + ' | ' + parts[1] : parts[0];
                 const p = parts[parts.length - 1];
                 tr.innerHTML = `<td style="padding:5px 0; border-bottom:1px solid #eee; font-size:10pt;">${t.trim()}</td>
                                 <td style="padding:5px 0; border-bottom:1px solid #eee; text-align:right; font-weight:700; color:#FF5D5B; font-size:10pt;">${p.trim()}</td>`;
             } else {
-                tr.innerHTML = `<td colspan="2" style="padding:5px 0; font-size:9pt; color:#666;">${line}</td>`;
+                tr.innerHTML = `<td colspan="2" style="padding:5px 0; font-size:9pt; color:#666;">${cleanLine}</td>`;
             }
             if (idx < 10) rows1.appendChild(tr); else if (rows2) rows2.appendChild(tr);
         });
@@ -272,24 +390,18 @@ document.getElementById('generate-pdf').onclick = function() {
         if (placeP2) placeP2.innerHTML = '';
         pageLast.innerHTML = '';
 
-        // 4. УПРАВЛЕНИЕ СТРУКТУРОЙ ШАБЛОНА (Физическое удаление)
         if (lines.length > 5) {
-            // Режим 6+ строк (Две страницы)
-            pageLast.remove(); // Удаляем 3-ю страницу совсем
+            pageLast.remove();
             page2.style.display = 'block';
-            
             if (lines.length >= 10 && placeP2) placeP2.appendChild(summary); else placeP1.appendChild(summary);
-            
             if (placeP2) {
                 placeP2.appendChild(contact1);
                 placeP2.appendChild(finalImg);
                 placeP2.appendChild(contact2);
             }
         } else {
-            // Режим 1-5 строк (Одна страница)
-            page2.remove(); // Удаляем 2-ю страницу
-            pageLast.remove(); // Удаляем 3-ю страницу
-            
+            page2.remove();
+            pageLast.remove();
             placeP1.appendChild(summary);
             placeP1.appendChild(contact1);
             placeP1.appendChild(finalImg);
@@ -306,7 +418,6 @@ document.getElementById('generate-pdf').onclick = function() {
             jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
         }).from(template).save().then(() => {
             wrapper.style.display = 'none';
-            // 5. ВОССТАНОВЛЕНИЕ: возвращаем удаленные страницы в DOM для следующего раза
             template.innerHTML = '';
             template.appendChild(page1);
             template.appendChild(page2Copy);
@@ -320,14 +431,31 @@ document.getElementById('generate-pdf').onclick = function() {
  * ФУНКЦИИ ОБНОВЛЕНИЯ
  */
 window.updateSolo = (f, v) => { STATE.solo[f] = f === 'employees' ? parseInt(v)||1 : v; render(); };
-window.addFastRow = () => { STATE.fastRows.push({id:Date.now(), region:'77', ulCount:1, ipCount:0}); render(); };
+window.addFastRow = () => { STATE.fastRows.push({id:Date.now(), region:'', ulCount:1, ipCount:0}); render(); };
 window.updateFast = (id, f, v) => { const r = STATE.fastRows.find(x=>x.id==id); if(r) r[f] = f.includes('Count') ? (parseInt(v)||0) : v; calculate(); };
 window.removeFast = (id) => { if(STATE.fastRows.length > 1) { STATE.fastRows = STATE.fastRows.filter(x=>x.id!=id); render(); } };
-window.addDetailedCompany = () => { STATE.detailedCompanies.push({id:Date.now(), name:'', inn:'', region:'77', ownership:'ul', lk:'none', multiUser:'none'}); render(); };
-window.updateDet = (id, f, v, redraw = true) => { const c = STATE.detailedCompanies.find(x=>x.id==id); if(c) c[f] = v; if(redraw) render(); else calculate(); };
+
+window.addDetailedCompany = () => { STATE.detailedCompanies.push({id:Date.now(), name:'', inn:'', region:'', ownership:'ul', lk:'none', multiUser:'none'}); render(); };
+
+// Изменено: redraw=false для текстовых полей, чтобы не сбрасывать фокус и не обрезать ввод
+window.updateDet = (id, f, v, redraw = true) => { 
+    const c = STATE.detailedCompanies.find(x => x.id == id); 
+    if (c) {
+        // Автоматическая замена обычных кавычек на "елочки" для красоты
+        if (f === 'name') {
+            v = v.replace(/"([^"]*)"/g, '«$1»').replace(/"/g, '»');
+        }
+        c[f] = v;
+    }
+    if (redraw) render(); else calculate(); 
+};
+
 window.removeDet = (id) => { if(STATE.detailedCompanies.length > 1) { STATE.detailedCompanies = STATE.detailedCompanies.filter(x=>x.id!=id); render(); } };
+
 window.toggleOption = (id, field, value) => { 
     const c = STATE.detailedCompanies.find(x=>x.id==id); if(!c) return;
     c[field] = c[field] === value ? 'none' : value;
+    if (field === 'lk' && c[field] !== 'none') c.multiUser = 'none'; 
+    if (field === 'multiUser' && c[field] !== 'none') c.lk = 'none'; 
     render(); 
 };
