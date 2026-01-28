@@ -284,11 +284,30 @@ function calculate() {
                 discountableTotal += pGK;
                 discountableBaseTotal += pBase;
                 
-                // Допы теперь с отступом (в интерфейсе)
-                if (c.lk === 'base') { total += 600; logs.push(`      ${compName} - ЛК Базовый | ${formatPrice(600)}`); }
-                if (c.lk === 'prof') { total += 900; logs.push(`      ${compName} - ЛК Проф | ${formatPrice(900)}`); }
-                if (c.multiUser === 'small') { total += 1620; logs.push(`      ${compName} - Многопольз. (2-9) | ${formatPrice(1620)}`); }
-                if (c.multiUser === 'large') { total += 3240; logs.push(`      ${compName} - Многопольз. (10+) | ${formatPrice(3240)}`); }
+                // Личный кабинет Базовый (Column31)
+                if (c.lk === 'base') { 
+                    const pLKBase = parseInt(t['Column31']) || 0; 
+                    total += pLKBase; 
+                    logs.push(`      ${compName} - ЛК Базовый | ${formatPrice(pLKBase)}`); 
+                }
+                // Личный кабинет Проф (Column33)
+                if (c.lk === 'prof') { 
+                    const pLKProf = parseInt(t['Column33']) || 0; 
+                    total += pLKProf; 
+                    logs.push(`      ${compName} - ЛК Проф | ${formatPrice(pLKProf)}`); 
+                }
+                // Многопользовательский режим 2-9
+                if (c.multiUser === 'small') { 
+                    const pMultiSmall = parseInt(t['Многопользовательский режим']) || 0; 
+                    total += pMultiSmall; 
+                    logs.push(`      ${compName} - Многопольз. (2-9) | ${formatPrice(pMultiSmall)}`); 
+                }
+                // Многопользовательский режим 10+ (Column29)
+                if (c.multiUser === 'large') { 
+                    const pMultiLarge = parseInt(t['Column29']) || 0; 
+                    total += pMultiLarge; 
+                    logs.push(`      ${compName} - Многопольз. (10+) | ${formatPrice(pMultiLarge)}`); 
+                }
             });
         }
         
