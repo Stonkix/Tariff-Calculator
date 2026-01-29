@@ -43,14 +43,19 @@
             <div id="details-content" style="font-size: 14px; white-space: pre-line; color: #444; line-height: 1.6;">Введите данные для расчета...</div>
         </div>
 
-        <div style="margin-top: 20px; padding: 15px; background: #fff; border: 1px solid #eee; border-radius: 12px; display: flex; align-items: center; justify-content: space-between;">
-            <label style="font-weight: 600; font-size: 14px; margin-right: 10px;">Дополнительная скидка:</label>
-            <div style="display: flex; gap: 10px; flex: 1; max-width: 320px;">
-                <select id="manual-disc-type" style="width: 140px;">
+        <div class="manual-discount-row">
+            <label style="font-weight: 600; font-size: 14px;">Дополнительная скидка:</label>
+            <div class="inputs-group">
+                <select id="manual-disc-type" style="width: 135px; flex-shrink: 0;">
                     <option value="percent">Процент %</option>
                     <option value="rub">Рубли ₽</option>
                 </select>
-                <input type="number" id="manual-disc-val" placeholder="0" min="0" style="flex: 1; text-align: center;">
+                <input type="number" 
+                    id="manual-disc-val" 
+                    placeholder="0" 
+                    min="0" 
+                    style="text-align: center; min-width: 0;"
+                    onkeydown="if(['-', 'e', 'E', ',', '.'].includes(event.key)) event.preventDefault();">
             </div>
         </div>
 
@@ -130,7 +135,9 @@
     </div>
     <div class="form-row" style="margin-top:15px;">
         <label>Сколько сотрудников будут подписывать отчетность своим сертификатом?</label>
-        <input type="number" id="solo-employees" min="1">
+        <input type="number" id="solo-employees" min="0" placeholder="1" 
+            onkeydown="if(['-', 'e', 'E', ',', '.'].includes(event.key)) event.preventDefault();"
+            oninput="window.updateSoloEmployees(this.value)">
     </div>
 </template>
 

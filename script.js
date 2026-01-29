@@ -413,15 +413,21 @@ function calculate() {
         if (t) {
             const isTwo = STATE.solo.duration === '2';
             const isUL = STATE.solo.ownership === 'ul';
+            
+            // Выбираем правильную колонку из конфига
             const mainPriceKey = isUL ? (isTwo ? 'ul_2year' : 'ul_base') : (isTwo ? 'ip_2year' : 'ip_base');
             const price = getPrice(t, mainPriceKey);
             
             total += price;
             logs.push(`Лицензия ${isUL ? 'ЮЛ' : 'ИП'}, ${t.Регион}, ${isTwo ? '2 года' : '1 год'} | ${formatPrice(price)}`);
 
+            // --- ОБРАБОТКА СОТРУДНИКОВ ---
+            // Если в поле пусто ("") или 0, считаем что сотрудник 1 (базовый тариф)
+            const empCount = (STATE.solo.employees === "" || STATE.solo.employees === 0) ? 1 : STATE.solo.employees;
+
             let multiKey = null;
-            if (STATE.solo.employees >= 2 && STATE.solo.employees <= 9) multiKey = 'multi_small';
-            else if (STATE.solo.employees >= 10) multiKey = 'multi_large';
+            if (empCount >= 2 && empCount <= 9) multiKey = 'multi_small';
+            else if (empCount >= 10) multiKey = 'multi_large';
 
             if (multiKey) {
                 const pMulti = getPrice(t, multiKey);
@@ -662,7 +668,18 @@ if (pdfBtn) {
 /**
  * 7. ФУНКЦИИ ОБНОВЛЕНИЯ (Window Scope)
  */
-window.updateSolo = (f, v) => { STATE.solo[f] = f === 'employees' ? parseInt(v)||1 : v; render(); };
+window.updateSolo = (f, v) => {
+    if (f === 'employees') {
+        // Разрешаем пустую строку в STATE, чтобы можно было всё стереть
+        STATE.solo.employees = v === "" ? "" : Math.max(0, parseInt(v) || 0);
+        // Не вызываем render() целиком, чтобы не перерисовывать всё поле и не терять фокус (курсор)
+        calculate(); 
+    } else {
+        STATE.solo[f] = v;
+        render(); // Для смены региона или типа ЮЛ/ИП перерисовка нужна
+    }
+};
+
 window.addFastRow = () => { STATE.fastRows.push({id:Date.now(), region:'', ulCount:1, ipCount:0}); render(); };
 window.updateFast = (id, f, v) => { const r = STATE.fastRows.find(x=>x.id==id); if(r) r[f] = f.includes('Count') ? (parseInt(v)||0) : v; calculate(); };
 window.removeFast = (id) => { if(STATE.fastRows.length > 1) { STATE.fastRows = STATE.fastRows.filter(x=>x.id!=id); render(); } };

@@ -101,7 +101,7 @@ input:focus { border-color: var(--brand); }
 
 /* Настройка шрифта для предупреждения (минимум 3 орг) */
 .price-warning {
-  font-size: 22px !important;
+  font-size: 18px !important;
   color: #999;
 }
 
@@ -241,4 +241,41 @@ input:checked + .slider:before {
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* Специальный класс для блока ручной скидки */
+.manual-discount-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding: 15px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  gap: 15px;
+}
+
+.manual-discount-row .inputs-group {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  max-width: 320px;
+}
+
+/* Адаптация для маленьких экранов */
+@media (max-width: 500px) {
+  .manual-discount-row {
+    flex-direction: column; /* Стек: заголовок сверху, поля снизу */
+    align-items: stretch;
+  }
+  
+  .manual-discount-row .inputs-group {
+    max-width: none;
+    width: 100%;
+  }
+
+  .manual-discount-row label {
+    margin-bottom: 0;
+  }
 }
