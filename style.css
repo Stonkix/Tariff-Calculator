@@ -242,40 +242,57 @@ input:checked + .slider:before {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
 }
-
 /* Специальный класс для блока ручной скидки */
 .manual-discount-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 20px;
-  padding: 15px;
+  margin-top: 25px; /* Увеличили отступ сверху */
+  padding: 18px;    /* Сделали блок чуть просторнее */
   background: #fff;
   border: 1px solid #eee;
-  border-radius: 12px;
+  border-radius: 16px; /* Округлили под общий стиль */
   gap: 15px;
 }
 
 .manual-discount-row .inputs-group {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   flex: 1;
   max-width: 320px;
 }
 
-/* Адаптация для маленьких экранов */
+/* Адаптация для маленьких экранов (мобильная версия) */
 @media (max-width: 500px) {
   .manual-discount-row {
     flex-direction: column; /* Стек: заголовок сверху, поля снизу */
     align-items: stretch;
+    padding: 20px;
   }
   
   .manual-discount-row .inputs-group {
     max-width: none;
     width: 100%;
+    margin-top: 10px; /* Добавили отступ между текстом и инпутами */
   }
 
   .manual-discount-row label {
-    margin-bottom: 0;
+    margin-bottom: 5px;
+    text-align: center; /* Центруем заголовок на мобилке */
+  }
+
+  /* Делаем элементы крупнее, чтобы удобно попадать пальцем */
+  #manual-disc-type, 
+  #manual-disc-val {
+    height: 48px; 
+    font-size: 16px; /* Предотвращает автоматическое приближение (zoom) на iPhone */
+  }
+
+  #manual-disc-type {
+    flex: 1;
+  }
+
+  #manual-disc-val {
+    flex: 1.5; /* Поле ввода числа чуть шире селекта */
   }
 }

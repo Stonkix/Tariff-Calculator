@@ -731,3 +731,12 @@ window.updateCustomPrice = (col, val) => {
     localStorage.setItem('my_custom_prices', JSON.stringify(STATE.customPrices));
     calculate(); 
 };
+
+window.updateSoloEmployees = (val) => {
+    // 1. Очищаем ввод от всего, кроме цифр
+    const cleanVal = val.toString().replace(/\D/g, '');
+    
+    // 2. Обновляем значение в STATE
+    STATE.solo.employees = cleanVal === "" ? "" : parseInt(cleanVal);
+    calculate(); 
+};

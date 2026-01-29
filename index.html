@@ -135,7 +135,10 @@
     </div>
     <div class="form-row" style="margin-top:15px;">
         <label>Сколько сотрудников будут подписывать отчетность своим сертификатом?</label>
-        <input type="number" id="solo-employees" min="0" placeholder="1" 
+        <input type="number" 
+            id="solo-employees" 
+            min="0" 
+            placeholder="1" 
             onkeydown="if(['-', 'e', 'E', ',', '.'].includes(event.key)) event.preventDefault();"
             oninput="window.updateSoloEmployees(this.value)">
     </div>
