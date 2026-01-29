@@ -659,7 +659,7 @@ if (pdfBtn) {
                 pageLast.remove();
                 page2.style.display = 'block';
                 // Если строк много, итоги переносим на 2 страницу
-                if (lines.length >= 10 && placeP2) placeP2.appendChild(summary); else placeP1.appendChild(summary);
+                if (lines.length >= 9 && placeP2) placeP2.appendChild(summary); else placeP1.appendChild(summary);
                 
                 if (placeP2) {
                     placeP2.appendChild(contact1);
