@@ -47,8 +47,8 @@ const CONFIG = {
     extraServices: [
         { key: 'lk', val: 'base', col: 'lk_base', label: 'ЛК Базовый' },
         { key: 'lk', val: 'prof', col: 'lk_prof', label: 'ЛК Проф' },
-        { key: 'multiUser', val: 'small', col: 'multi_small', label: 'Многопольз. (2-9)' },
-        { key: 'multiUser', val: 'large', col: 'multi_large', label: 'Многопольз. (10+)' }
+        { key: 'multiUser', val: 'small', col: 'multi_small', label: 'Многопользовательский режим (2-9)' },
+        { key: 'multiUser', val: 'large', col: 'multi_large', label: 'Многопользовательский режим (10+)' }
     ]
 };
 
@@ -95,7 +95,7 @@ const getRegionOptions = (selected) => {
  */
 document.addEventListener('DOMContentLoaded', async () => {
     // Восстановление телефона/email
-    const fields = ['partner-phone', 'partner-email'];
+    const fields = ['partner-phone', 'partner-email', 'partner-name'];
     fields.forEach(id => {
         const saved = localStorage.getItem(`p-${id}`);
         const el = document.getElementById(id);
@@ -576,30 +576,56 @@ if (pdfBtn) {
             const page2Copy = page2.cloneNode(true);
             const pageLastCopy = pageLast.cloneNode(true);
 
+            // Очистка старых динамических элементов
             document.querySelectorAll('.pdf-dynamic-el').forEach(el => el.remove());
             
+            // 1. Создаем и наполняем блок ИТОГО
             const summary = createPdfBlock('summary-block');
             summary.querySelector('.pdf-total-val').innerText = document.getElementById('total-price').innerText;
             
-            const disc = document.getElementById('discount-info');
-            if (disc?.offsetParent) summary.querySelector('.pdf-discount-val').innerText = disc.innerText.replace('ⓘ', '');
+            const clientInput = document.getElementById('client-name')?.value.trim();
+            const clientTitleEl = summary.querySelector('#pdf-client-title');
+            if (clientTitleEl) {
+                clientTitleEl.innerText = clientInput ? `Стоимость для ${clientInput}:` : "Стоимость для вас:";
+            }
 
+            const disc = document.getElementById('discount-info');
+            if (disc?.offsetParent) {
+                summary.querySelector('.pdf-discount-val').innerText = disc.innerText.replace('ⓘ', '');
+            }
+
+            // 2. Создаем и наполняем блок КОНТАКТОВ
             const contactSource = document.getElementById('contact-box-template');
             const contact1 = contactSource.cloneNode(true);
             contact1.classList.add('pdf-dynamic-el');
             contact1.style.display = 'flex';
             contact1.style.pageBreakInside = 'avoid';
+
+            // Вставляем ФИО сотрудника
+            const employeeInput = document.getElementById('partner-name')?.value.trim();
+            const empNameEl = contact1.querySelector('#pdf-employee-name');
+            if (empNameEl) {
+                if (employeeInput) {
+                    empNameEl.innerText = employeeInput;
+                } else {
+                    empNameEl.remove(); // Если не заполнено, просто удаляем узел
+                }
+            }
+
+            // Вставляем телефон и почту
             contact1.querySelector('.c-phone').innerText = document.getElementById('partner-phone').value;
             contact1.querySelector('.c-email').innerText = document.getElementById('partner-email').value;
             
+            // Создаем копию контактов для второй страницы
             const contact2 = contact1.cloneNode(true);
 
+            // 3. Подготовка картинки футера
             const finalImg = document.createElement('img');
             finalImg.src = "pdf-footer.jpg";
             finalImg.style = "width:100%; display:block; margin-top: 15px; page-break-inside: avoid;";
             finalImg.classList.add('pdf-dynamic-el');
 
-            // В PDF убираем отступы (trim) чтобы сохранить исходный вид
+            // 4. Распределение строк по таблицам
             const lines = document.getElementById('details-content').innerText.split('\n').filter(l => l.trim());
             const rows1 = document.getElementById('pdf-rows');
             const rows2 = page2.querySelector('#pdf-rows-p2');
@@ -608,7 +634,7 @@ if (pdfBtn) {
             if (rows2) rows2.innerHTML = '';
 
             lines.forEach((line, idx) => {
-                const cleanLine = line.trim(); // Очистка отступов для PDF
+                const cleanLine = line.trim();
                 const tr = document.createElement('tr');
                 if (cleanLine.includes('|')) {
                     const parts = cleanLine.split('|');
@@ -622,6 +648,7 @@ if (pdfBtn) {
                 if (idx < 10) rows1.appendChild(tr); else if (rows2) rows2.appendChild(tr);
             });
 
+            // 5. Размещение блоков на страницах
             const placeP1 = document.getElementById('res-place-p1');
             const placeP2 = page2.querySelector('#res-place-p2');
             placeP1.innerHTML = '';
@@ -631,7 +658,9 @@ if (pdfBtn) {
             if (lines.length > 5) {
                 pageLast.remove();
                 page2.style.display = 'block';
+                // Если строк много, итоги переносим на 2 страницу
                 if (lines.length >= 10 && placeP2) placeP2.appendChild(summary); else placeP1.appendChild(summary);
+                
                 if (placeP2) {
                     placeP2.appendChild(contact1);
                     placeP2.appendChild(finalImg);
@@ -648,6 +677,7 @@ if (pdfBtn) {
 
             wrapper.style.display = 'block';
 
+            // Генерируем PDF
             html2pdf().set({
                 margin: 0,
                 filename: 'КП_1С_Отчетность.pdf',
@@ -665,7 +695,6 @@ if (pdfBtn) {
         } catch (e) { console.error("Ошибка PDF:", e); }
     };
 }
-
 /**
  * 7. ФУНКЦИИ ОБНОВЛЕНИЯ (Window Scope)
  */
