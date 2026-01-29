@@ -333,6 +333,7 @@ function renderGlobalAddons() {
     CONFIG.globalAddons.forEach(addon => {
         const state = STATE.addons[addon.id];
         const card = document.createElement('div');
+        card.setAttribute('data-addon-id', addon.id);
         card.className = `addon-card ${state.enabled ? 'active' : ''}`;
         
         let variantsHtml = '';
@@ -356,7 +357,7 @@ function renderGlobalAddons() {
             // Строка настройки цены (в скрытом блоке)
         priceSettingsHtml += `
             <div class="variant-row" style="border-bottom: 1px dashed #eee; padding: 5px 0;">
-                <span style="font-size: 11px; color: #666;">${item.label.split('(')[1]?.replace(')', '') || 'Цена'}</span>
+                <span>${item.label}</span>
                 <input type="number" 
                     min="0" 
                     placeholder="${defaultPrice}" 
@@ -708,8 +709,19 @@ window.toggleOption = (id, field, value) => {
 };
 
 window.toggleAddon = (id) => {
+    // 1. Переключаем состояние в данных
     STATE.addons[id].enabled = !STATE.addons[id].enabled;
-    render(); // Перерисовываем для открытия/закрытия списка
+    
+    // 2. Находим карточку в HTML и меняем её визуально без полной перерисовки
+    const card = document.querySelector(`[data-addon-id="${id}"]`);
+    if (card) {
+        card.classList.toggle('active', STATE.addons[id].enabled);
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = STATE.addons[id].enabled;
+    }
+    
+    // 3. Пересчитываем итоги
+    calculate(); 
 };
 
 window.updateAddonValue = (aId, iId, val) => {
