@@ -12,9 +12,38 @@ const CONFIG = {
         multi_small: 'Многопользовательский режим', // Доп: 2-9 пользователей
         multi_large: 'Column29',                   // Доп: 10+ пользователей
         lk_base: 'Column31',                       // Доп: ЛК Базовый
-        lk_prof: 'Column33'                        // Доп: ЛК Проф
+        lk_prof: 'Column33',                        // Доп: ЛК Проф
+        mchd_1: 'Старт работы с МЧД в 1С-Отчетность', // 1 мчд
+        mchd_2: 'Column37', // 2 мчд
+        mchd_3: 'Column38', // 3 мчд
+        setup_1: 'Удалённая настройка рабочего места для работы с электронной подписью', // ОС Windows nalog.ru или ЕСИА
+        setup_2: 'Column40', // 2500 ОС Windows nalog.ru и ЕСИА
+        setup_3: 'Column41', // 7500 ОС MacOs nalog.ru или ЕСИА
+        setup_4: 'Column42'  // 8000 ОС MacOs nalog.ru и ЕСИА
     },
-    // Список дополнительных услуг для перебора в цикле (убирает дублирование if-ов)
+    // Список дополнительных услуг для карточек компаний
+    // Описание карточек допов
+    globalAddons: [
+        {
+            id: 'mchd',
+            title: 'Старт работы с МЧД в 1С-Отчетность',
+            items: [
+                { id: 'v1', label: 'Старт работы с МЧД в 1С-Отчетность (1 МЧД)', col: 'mchd_1' },
+                { id: 'v2', label: 'Старт работы с МЧД в 1С-Отчетность (2 МЧД)', col: 'mchd_2' },
+                { id: 'v3', label: 'Старт работы с МЧД в 1С-Отчетность (3 МЧД)', col: 'mchd_3' }
+            ]
+        },
+        {
+            id: 'setup',
+            title: 'Удалённая настройка рабочего места',
+            items: [
+                { id: 's1', label: 'Удалённая настройка рабочего места для OC Windows (nalog.ru или ЕСИА)', col: 'setup_1' },
+                { id: 's2', label: 'Удалённая настройка рабочего места для OC Windows (nalog.ru и ЕСИА)', col: 'setup_2' },
+                { id: 's3', label: 'Удалённая настройка рабочего места для OC MacOS (nalog.ru или ЕСИА)', col: 'setup_3' },
+                { id: 's4', label: 'Удалённая настройка рабочего места для OC MacOS (nalog.ru и ЕСИА)', col: 'setup_4' }
+            ]
+        }
+    ],
     extraServices: [
         { key: 'lk', val: 'base', col: 'lk_base', label: 'ЛК Базовый' },
         { key: 'lk', val: 'prof', col: 'lk_prof', label: 'ЛК Проф' },
@@ -35,8 +64,15 @@ const STATE = {
     solo: { region: '', ownership: 'ul', duration: '1', employees: 1 },
     fastRows: [{ id: Date.now(), region: '', ulCount: 1, ipCount: 0 }],
     detailedCompanies: [{ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none' }],
-    manualDiscount: { type: 'percent', value: 0 }
+    manualDiscount: { type: 'percent', value: 0 },
+    addons: {},  // Хранение состояния включенных допов и их количества
+    customPrices : {}, // Храним кастомные цены на допы от партнеров
 };
+
+CONFIG.globalAddons.forEach(g => {
+    STATE.addons[g.id] = { enabled: false, values: {} };
+    g.items.forEach(i => STATE.addons[g.id].values[i.id] = 0);
+});
 
 // Форматирование цены
 const formatPrice = (v) => Math.round(v).toLocaleString('ru-RU') + ' ₽';
@@ -66,7 +102,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (saved && el) el.value = saved;
         if (el) el.oninput = (e) => localStorage.setItem(`p-${id}`, e.target.value);
     });
-
+    // Восстанавливаем цены партнеров
+    const savedPrices = localStorage.getItem('my_custom_prices');
+    if (savedPrices) {
+        try {
+            // Превращаем строку обратно в объект и записываем в STATE
+            STATE.customPrices = JSON.parse(savedPrices);
+        } catch (e) {
+            console.error("Ошибка загрузки цен:", e);
+            STATE.customPrices = {};
+        }
+    }
     // Настройка ручной скидки
     const discType = document.getElementById('manual-disc-type');
     const discVal = document.getElementById('manual-disc-val');
@@ -150,6 +196,7 @@ function render() {
         else if (STATE.mode === 'detailed') renderDetailedMode(container, false);
         else renderFastGroupMode(container);
     }
+    renderGlobalAddons();
     calculate();
 }
 
@@ -275,6 +322,72 @@ function renderDetailedMode(container, showExisting) {
     container.appendChild(content);
 }
 
+function renderGlobalAddons() {
+    const container = document.getElementById('global-addons-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Берем базовый тариф для отображения дефолтных цен
+    const refTariff = STATE.tariffs[0] || {};
+
+    CONFIG.globalAddons.forEach(addon => {
+        const state = STATE.addons[addon.id];
+        const card = document.createElement('div');
+        card.className = `addon-card ${state.enabled ? 'active' : ''}`;
+        
+        let variantsHtml = '';
+        let priceSettingsHtml = '';
+
+        addon.items.forEach(item => {
+            // Базовая цена из JSON (стандарт)
+            const defaultPrice = parseInt(refTariff[CONFIG.columns[item.col]]) || 0;
+            // Кастомная цена, если она есть в STATE
+            const customPrice = STATE.customPrices[item.col];
+
+            // Строка выбора количества
+            variantsHtml += `
+                <div class="variant-row">
+                    <span style="flex: 1; padding-right: 10px;">${item.label}</span>
+                    <input type="number" min="0" placeholder="0" 
+                        value="${state.values[item.id] || ''}" 
+                        oninput="window.updateAddonValue('${addon.id}', '${item.id}', this.value)">
+                </div>`;
+
+            // Строка настройки цены (в скрытом блоке)
+        priceSettingsHtml += `
+            <div class="variant-row" style="border-bottom: 1px dashed #eee; padding: 5px 0;">
+                <span style="font-size: 11px; color: #666;">${item.label.split('(')[1]?.replace(')', '') || 'Цена'}</span>
+                <input type="number" 
+                    min="0" 
+                    placeholder="${defaultPrice}" 
+                    value="${customPrice !== undefined ? customPrice : ''}" 
+                    style="width: 70px; background: #fffcf0; border-color: #ffd1a4;"
+                    onkeydown="if(['-', 'e', 'E', ',', '.'].includes(event.key)) event.preventDefault();"
+                    oninput="window.updateCustomPrice('${item.col}', this.value)">
+            </div>`;
+        });
+
+        card.innerHTML = `
+            <div class="addon-header">
+                <span class="addon-title">${addon.title}</span>
+                <label class="custom-switch">
+                    <input type="checkbox" ${state.enabled ? 'checked' : ''} onchange="window.toggleAddon('${addon.id}')">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="addon-variants">
+                ${variantsHtml}
+                <details style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                    <summary style="font-size: 11px; color: #FF5D5B; cursor: pointer; font-weight: 600;">Изменить стоимость</summary>
+                    <div style="margin-top: 10px; background: #fafafa; padding: 10px; border-radius: 8px;">
+                        ${priceSettingsHtml}
+                    </div>
+                </details>
+            </div>`;
+        container.appendChild(card);
+    });
+}
+
 /**
  * 5. ЛОГИКА РАСЧЕТОВ (Оптимизированная)
  */
@@ -292,25 +405,20 @@ function calculate() {
 
     if (!ui.price || !ui.details || !ui.discount) return;
 
-    // --- РЕЖИМ: ОДИНОЧНАЯ ОРГАНИЗАЦИЯ ---
+    // --- 1. РЕЖИМ: ОДИНОЧНАЯ ОРГАНИЗАЦИЯ ---
     if (!STATE.isGroup) {
         ui.discount.style.display = 'none';
-        
-        // Используем карту для быстрого доступа
         const t = STATE.tariffMap[STATE.solo.region];
         
         if (t) {
             const isTwo = STATE.solo.duration === '2';
             const isUL = STATE.solo.ownership === 'ul';
-            
-            // Выбираем правильную колонку из конфига
             const mainPriceKey = isUL ? (isTwo ? 'ul_2year' : 'ul_base') : (isTwo ? 'ip_2year' : 'ip_base');
             const price = getPrice(t, mainPriceKey);
             
             total += price;
             logs.push(`Лицензия ${isUL ? 'ЮЛ' : 'ИП'}, ${t.Регион}, ${isTwo ? '2 года' : '1 год'} | ${formatPrice(price)}`);
 
-            // Доп. опция: Многопользовательский режим
             let multiKey = null;
             if (STATE.solo.employees >= 2 && STATE.solo.employees <= 9) multiKey = 'multi_small';
             else if (STATE.solo.employees >= 10) multiKey = 'multi_large';
@@ -322,9 +430,8 @@ function calculate() {
             }
         }
     } 
-    // --- РЕЖИМ: ГРУППА КОМПАНИЙ (ГК) ---
+    // --- 2. РЕЖИМ: ГРУППА КОМПАНИЙ (ГК) ---
     else {
-        // Подсчет кол-ва
         const count = (STATE.mode === 'addon' ? STATE.existingCount : 0) + 
                       (STATE.mode === 'fast' ? STATE.fastRows.reduce((a, b) => a + (parseInt(b.ulCount)||0) + (parseInt(b.ipCount)||0), 0) : STATE.detailedCompanies.length);
         
@@ -335,14 +442,11 @@ function calculate() {
         }
 
         ui.discount.style.display = 'block';
-        const col = getGroupColumnKey(count); // Колонки скидок (Column5...Column20)
+        const col = getGroupColumnKey(count);
 
-        // 1. Быстрый ввод
         if (STATE.mode === 'fast') {
             STATE.fastRows.forEach(r => {
                 const t = STATE.tariffMap[r.region]; if (!t) return;
-                
-                // ЮЛ
                 if (r.ulCount > 0) {
                     const pGK = parseInt(t[col.ul]) || 0;
                     const pBase = getPrice(t, 'ul_base');
@@ -351,7 +455,6 @@ function calculate() {
                     discBaseTotal += pBase * r.ulCount;
                     logs.push(`ЮЛ (${t.Регион}) | ${formatPrice(pGK)} x ${r.ulCount} | ${formatPrice(pGK * r.ulCount)}`);
                 }
-                // ИП
                 if (r.ipCount > 0) {
                     const pGK = parseInt(t[col.ip]) || 0;
                     const pBase = getPrice(t, 'ip_base');
@@ -362,23 +465,19 @@ function calculate() {
                 }
             });
         } 
-        // 2. Детальный ввод
         else {
             STATE.detailedCompanies.forEach(c => {
                 const t = STATE.tariffMap[c.region]; if (!t) return;
-                
                 const isUL = c.ownership === 'ul';
                 const pGK = parseInt(t[isUL ? col.ul : col.ip]) || 0;
                 const pBase = getPrice(t, isUL ? 'ul_base' : 'ip_base');
                 const compName = c.name || 'Организация';
 
                 logs.push(`${compName} (${isUL ? 'ЮЛ' : 'ИП'}, ${t.Регион}) | ${formatPrice(pGK)}`);
-
                 total += pGK;
                 discCurrentTotal += pGK;
                 discBaseTotal += pBase;
 
-                // Перебор доп. услуг через CONFIG (без дублирования if-ов)
                 CONFIG.extraServices.forEach(srv => {
                     if (c[srv.key] === srv.val) {
                         const srvPrice = getPrice(t, srv.col);
@@ -388,20 +487,44 @@ function calculate() {
                 });
             });
         }
-        
-        // Расчет % скидки
         const pct = discBaseTotal > 0 ? Math.round(((discBaseTotal - discCurrentTotal) / discBaseTotal) * 100) : 0;
         ui.discount.innerHTML = `Скидка ГК: ${pct}% ⓘ`;
     }
 
-    // --- РУЧНАЯ СКИДКА ---
+    // --- 3. РАСЧЕТ ДОПОЛНИТЕЛЬНЫХ УСЛУГ (МЧД и Настройка) ---
+    // Берем цены из текущего региона или первого в списке
+    let refTariff = !STATE.isGroup ? STATE.tariffMap[STATE.solo.region] : STATE.tariffs[0];
+        
+        if (refTariff) {
+            CONFIG.globalAddons.forEach(addon => {
+                const state = STATE.addons[addon.id];
+                if (state && state.enabled) {
+                    addon.items.forEach(item => {
+                        const qty = parseInt(state.values[item.id]) || 0;
+                        if (qty > 0) {
+                            // ЛОГИКА ЦЕНЫ: сначала смотрим ручной ввод, потом тариф
+                            const defaultPrice = getPrice(refTariff, item.col);
+                            const price = STATE.customPrices[item.col] !== undefined 
+                                        ? STATE.customPrices[item.col] 
+                                        : defaultPrice;
+
+                            total += price * qty;
+                            // Пишем сразу в общий лог без заголовка
+                            logs.push(`${item.label} | ${formatPrice(price)} x ${qty} | ${formatPrice(price * qty)}`);
+                        }
+                    });
+                }
+            });
+        }
+
+    // --- 4. РУЧНАЯ СКИДКА ---
     let finalTotal = total;
     if (STATE.manualDiscount.value > 0) {
         let discAmount = STATE.manualDiscount.type === 'percent' 
             ? total * (STATE.manualDiscount.value / 100) 
             : STATE.manualDiscount.value;
             
-        logs.push(`Доп. скидка ${STATE.manualDiscount.type === 'percent' ? STATE.manualDiscount.value + '%' : '(руб)'} | -${formatPrice(discAmount)}`);
+        logs.push(`\nДоп. скидка ${STATE.manualDiscount.type === 'percent' ? STATE.manualDiscount.value + '%' : '(руб)'} | -${formatPrice(discAmount)}`);
         finalTotal = Math.max(0, total - discAmount);
     }
 
@@ -565,4 +688,29 @@ window.toggleOption = (id, field, value) => {
     if (field === 'lk' && c[field] !== 'none') c.multiUser = 'none'; 
     if (field === 'multiUser' && c[field] !== 'none') c.lk = 'none'; 
     render(); 
+};
+
+window.toggleAddon = (id) => {
+    STATE.addons[id].enabled = !STATE.addons[id].enabled;
+    render(); // Перерисовываем для открытия/закрытия списка
+};
+
+window.updateAddonValue = (aId, iId, val) => {
+    STATE.addons[aId].values[iId] = parseInt(val) || 0;
+    calculate(); // Просто пересчитываем цифры
+};
+
+window.updateCustomPrice = (col, val) => {
+    if (val === "") {
+        delete STATE.customPrices[col];
+    } else {
+        // Очищаем всё, кроме цифр (на случай вставки текста)
+        let cleanVal = val.toString().replace(/\D/g, '');
+        let numericValue = parseInt(cleanVal) || 0;
+        
+        STATE.customPrices[col] = numericValue;
+    }
+    
+    localStorage.setItem('my_custom_prices', JSON.stringify(STATE.customPrices));
+    calculate(); 
 };
