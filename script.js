@@ -681,7 +681,7 @@ if (pdfBtn) {
             html2pdf().set({
                 margin: 0,
                 filename: 'КП_1С_Отчетность.pdf',
-                image: { type: 'jpeg', quality: 0.98 },
+                image: { type: 'jpeg', quality: 1 },
                 html2canvas: { scale: 3, useCORS: true },
                 jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
             }).from(template).save().then(() => {
