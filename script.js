@@ -622,7 +622,7 @@ if (pdfBtn) {
             // 3. Подготовка картинки футера
             const finalImg = document.createElement('img');
             finalImg.src = "pdf-footer.jpg";
-            finalImg.style = "width:100%; display:block; margin-top: 15px; page-break-inside: avoid;";
+            finalImg.style = "width:100%; display:block; margin-top: 5px;  page-break-inside: avoid;";
             finalImg.classList.add('pdf-dynamic-el');
 
             // 4. Распределение строк по таблицам
@@ -640,12 +640,12 @@ if (pdfBtn) {
                     const parts = cleanLine.split('|');
                     const t = parts.length > 2 ? parts[0] + ' | ' + parts[1] : parts[0];
                     const p = parts[parts.length - 1];
-                    tr.innerHTML = `<td style="padding:5px 0; border-bottom:1px solid #eee; font-size:10pt;">${t.trim()}</td>
-                                    <td style="padding:5px 0; border-bottom:1px solid #eee; text-align:right; font-weight:700; color:#FF5D5B; font-size:10pt;">${p.trim()}</td>`;
+                    tr.innerHTML = `<td style="padding:3px 0; border-bottom:1px solid #eee; font-size:10pt;">${t.trim()}</td>
+                                    <td style="padding:3px 0; border-bottom:1px solid #eee; text-align:right; font-weight:700; color:#FF5D5B; font-size:10pt;">${p.trim()}</td>`;
                 } else {
-                    tr.innerHTML = `<td colspan="2" style="padding:5px 0; font-size:9pt; color:#666;">${cleanLine}</td>`;
+                    tr.innerHTML = `<td colspan="2" style="padding:3px 0; font-size:9pt; color:#666;">${cleanLine}</td>`;
                 }
-                if (idx < 10) rows1.appendChild(tr); else if (rows2) rows2.appendChild(tr);
+                if (idx < 16) rows1.appendChild(tr); else if (rows2) rows2.appendChild(tr);
             });
 
             // 5. Размещение блоков на страницах
@@ -655,11 +655,11 @@ if (pdfBtn) {
             if (placeP2) placeP2.innerHTML = '';
             pageLast.innerHTML = '';
 
-            if (lines.length > 5) {
+            if (lines.length > 7) {
                 pageLast.remove();
                 page2.style.display = 'block';
                 // Если строк много, итоги переносим на 2 страницу
-                if (lines.length >= 9 && placeP2) placeP2.appendChild(summary); else placeP1.appendChild(summary);
+                if (lines.length >= 14 && placeP2) placeP2.appendChild(summary); else placeP1.appendChild(summary);
                 
                 if (placeP2) {
                     placeP2.appendChild(contact1);
