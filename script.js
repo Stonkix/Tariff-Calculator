@@ -550,7 +550,7 @@ function getGroupColumnKey(n) {
 }
 
 /**
- * 6. ГЕНЕРАЦИЯ PDF - Будет переделана под другой дизайн
+ * 6. ГЕНЕРАЦИЯ PDF 
  */
 const pdfBtn = document.getElementById('generate-pdf');
 if (pdfBtn) {
