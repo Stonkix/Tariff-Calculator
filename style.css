@@ -6,6 +6,10 @@
   --card-shadow: 0 10px 30px rgba(0,0,0,0.05);
 }
 
+* {
+  box-sizing: border-box;
+  font-family: 'Montserrat', sans-serif; 
+}
 * { box-sizing: border-box; }
 
 body {
