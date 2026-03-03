@@ -449,18 +449,16 @@ function initPDF() {
 }
 
 async function buildPDF() {
-    // jsPDF доступен через window.jspdf.jsPDF (UMD сборка)
     const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
     if (!jsPDFClass) throw new Error('jsPDF не найден. Проверьте подключение скрипта jspdf.umd.min.js');
-    if (typeof html2canvas === 'undefined') throw new Error('html2canvas не найден. Проверьте подключение скрипта html2canvas.min.js');
+    if (typeof html2canvas === 'undefined') throw new Error('html2canvas не найден');
 
-    const PAGE_W = 794;
-    const PAGE_H = 1122;
-    const PAD    = 50;
-    const MF     = "font-family:'Montserrat',sans-serif;box-sizing:border-box;";
+    const PAGE_W  = 794;   // ширина страницы в px (DOM)
+    const PAGE_H  = 1122;  // высота страницы A4 в px (DOM)
+    const PAD     = 50;    // горизонтальный отступ контента
+    const MF      = "font-family:'Montserrat',sans-serif;box-sizing:border-box;";
 
-    const headerSrc    = CONFIG.getAssetPath('header');
-    const footerSrc    = CONFIG.getAssetPath('footer');
+    // ─── Данные ──────────────────────────────────────────────────────────
     const totalText    = document.getElementById('calc-total-price')?.innerText || '';
     const discEl       = document.getElementById('calc-discount-info');
     const discText     = (discEl && discEl.offsetParent !== null) ? discEl.innerText.replace('ⓘ','').trim() : '';
@@ -470,6 +468,31 @@ async function buildPDF() {
     const partnerEmail = document.getElementById('calc-partner-email')?.value.trim() || '';
     const lines        = (document.getElementById('calc-details-content')?.innerText || '')
         .split('\n').map(s => s.trim()).filter(Boolean);
+
+    // Пути к изображениям — footer нумерованные, рядом с html
+    const headerSrc  = CONFIG.getAssetPath('header');
+    const baseDir    = headerSrc ? headerSrc.replace(/[^/\\]*$/, '') : '';
+    const FOOTER_N   = 6;
+    const footerSrcs = Array.from({length: FOOTER_N}, (_, i) => `${baseDir}pdf-footer-${i+1}.jpg`);
+
+    // ─── Helpers ─────────────────────────────────────────────────────────
+    const waitImg = img => new Promise(res => {
+        if (!img.src) { res(); return; }
+        if (img.complete && img.naturalHeight > 0) { res(); return; }
+        img.onload = img.onerror = res;
+    });
+    const mount = el => {
+        el.style.position = 'absolute';
+        el.style.top = '0';
+        el.style.left = '-9999px';
+        el.style.zIndex = '-1';
+        document.body.appendChild(el);
+    };
+    const unmount = el => { if (el && el.parentNode) el.parentNode.removeChild(el); };
+    const toCanvas = el => html2canvas(el, {
+        scale: 5, useCORS: true, allowTaint: true, logging: false,
+        width: PAGE_W, windowWidth: PAGE_W
+    });
 
     const rowHTML = line => {
         if (!line.includes('|'))
@@ -507,126 +530,126 @@ async function buildPDF() {
         </div>`;
     };
 
-    const waitImg = img => new Promise(res => {
-        if (!img.src) { res(); return; }
-        if (img.complete && img.naturalHeight > 0) { res(); return; }
-        img.onload = img.onerror = res;
-    });
-
-    const mount = el => {
-        el.style.position = 'absolute';
-        el.style.top = '0';
-        el.style.left = '-9999px';
-        el.style.zIndex = '-1';
-        document.body.appendChild(el);
+    // Измеряем высоту произвольного HTML в контейнере шириной PAGE_W
+    const measureHeight = html => {
+        const div = document.createElement('div');
+        div.style.cssText = `width:${PAGE_W}px;position:absolute;top:0;left:-9999px;visibility:hidden;`;
+        div.innerHTML = html;
+        document.body.appendChild(div);
+        const h = div.getBoundingClientRect().height;
+        document.body.removeChild(div);
+        return h;
     };
-    const unmount = el => { if (el && el.parentNode) el.parentNode.removeChild(el); };
 
-    const toCanvas = el => html2canvas(el, {
-        scale: 3, useCORS: true, allowTaint: true, logging: false,
-        width: PAGE_W, windowWidth: PAGE_W
-    });
-
-    // ── Разбивка строк — больше 14 уходят на стр2 ──
-    const HEADER_H = Math.round(PAGE_W * 800 / 1035);
-    const hasContact = !!(partnerName || partnerPhone || partnerEmail);
-
-    const rows1 = lines.slice(0, 14);
-    const rows2 = lines.slice(14);
-    const contactOnP1 = rows2.length === 0 && hasContact;
-    const summaryOnP1 = rows2.length === 0;
-
-    // ── Измеряем реальную высоту контента стр1 в DOM ──
-    // Рендерим контент без контактов, замеряем, решаем влезают ли контакты
-
-    // Сначала узнаём высоту header в px (при scale=1, в DOM)
-    const headerRealH = Math.round(PAGE_W * 800 / 1035);
-    // Доступная высота для контента на стр1 (PAGE_H минус header)
-    const availableH = PAGE_H - headerRealH;
-
-    // Рендерим контент без контактов и замеряем
-    const measureDiv = document.createElement('div');
-    measureDiv.style.cssText = `width:${PAGE_W}px;position:absolute;top:0;left:-9999px;`;
-    measureDiv.innerHTML = `<div style="padding:20px ${PAD}px 30px;">
-        <h2 style="color:#FF5D5B;font-size:15px;margin:0 0 10px 0;font-weight:800;">Стоимость подключения:</h2>
-        <table style="width:100%;border-collapse:collapse;">
-            <tbody>${rows1.map(rowHTML).join('')}</tbody>
-        </table>
-        ${summaryHTML()}
-    </div>`;
-    document.body.appendChild(measureDiv);
-    const contentH = measureDiv.getBoundingClientRect().height;
-
-    // Замеряем высоту блока контактов
-    let contactBlockH = 0;
-    if (hasContact) {
-        const measureContact = document.createElement('div');
-        measureContact.style.cssText = `width:${PAGE_W}px;position:absolute;top:0;left:-9999px;`;
-        measureContact.innerHTML = contactHTML();
-        document.body.appendChild(measureContact);
-        contactBlockH = measureContact.getBoundingClientRect().height + 14; // +14 margin-top
-        document.body.removeChild(measureContact);
-    }
-    document.body.removeChild(measureDiv);
-
-    // Решаем: влезают ли контакты на стр1?
-    const contactFitsP1 = hasContact && (contentH + contactBlockH) <= availableH;
-    const finalContactOnP1 = rows2.length === 0 && contactFitsP1;
-    const finalNeedP2 = !finalContactOnP1 && (hasContact || rows2.length > 0);
-
-    // ── СТРАНИЦА 1: header и контент рендерим раздельно ──
-    // Header div
+    // ─── Шаг 1: рендерим header ───────────────────────────────────────────
     const divHeader = document.createElement('div');
-    divHeader.style.cssText = `width:${PAGE_W}px;background:#fff;${MF}`;
+    divHeader.style.cssText = `width:${PAGE_W}px;background:#fff;`;
     if (headerSrc) {
         const img = document.createElement('img');
         img.src = headerSrc;
+        // Header растягиваем на всю ширину страницы
         img.style.cssText = `width:${PAGE_W}px;display:block;`;
         divHeader.appendChild(img);
     }
     mount(divHeader);
     await Promise.all(Array.from(divHeader.querySelectorAll('img')).map(waitImg));
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 100));
     const canvasHeader = await toCanvas(divHeader);
     unmount(divHeader);
 
-    // Контент div (без header)
-    const divContent1 = document.createElement('div');
-    divContent1.style.cssText = `width:${PAGE_W}px;background:#fff;${MF}`;
-    divContent1.innerHTML = `<div style="padding:20px ${PAD}px 30px;">
-        <h2 style="color:#FF5D5B;font-size:15px;margin:0 0 10px 0;font-weight:800;${MF}">Стоимость подключения:</h2>
-        <table style="width:100%;border-collapse:collapse;">
-            <tbody>${rows1.map(rowHTML).join('')}</tbody>
-        </table>
-        ${summaryOnP1 ? summaryHTML() : ''}
-        ${finalContactOnP1 ? contactHTML() : ''}
+    // Высота header в DOM-пикселях (при scale=1)
+    const headerH_px = Math.round(PAGE_W * canvasHeader.height / canvasHeader.width);
+
+    // ─── Шаг 2: измеряем высоту контента (таблица + итог + контакты) ─────
+    const contentBodyHTML = `<div style="padding:20px ${PAD}px 10px;${MF}">
+        <h2 style="color:#FF5D5B;font-size:15px;margin:0 0 10px 0;font-weight:800;">Стоимость подключения:</h2>
+        <table style="width:100%;border-collapse:collapse;"><tbody>${lines.map(rowHTML).join('')}</tbody></table>
+        ${summaryHTML()}
+        ${contactHTML()}
     </div>`;
+    const contentH_px = measureHeight(contentBodyHTML);
+
+    // ─── Шаг 3: предзагружаем footer-изображения ─────────────────────────
+    // Footer: натуральный размер / 1.5 (изображения созданы при DPR=1.5),
+    // но не шире contentWidth. Отображаются с паддингом PAD с каждой стороны.
+    const contentWidth = PAGE_W - PAD * 2; // 694px
+    const FOOTER_SCALE = 1.5;
+
+    const footerNaturalSizes = await Promise.all(footerSrcs.map(src => new Promise(res => {
+        const img = new Image();
+        img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight, ok: true });
+        img.onerror = () => res({ w: 0, h: 0, ok: false });
+        img.src = src;
+    })));
+    const footerDisplayHeights = footerNaturalSizes.map(({ w, h }) => {
+        if (!w) return 0;
+        const dw = Math.min(Math.round(w / FOOTER_SCALE), contentWidth);
+        return Math.round(h * dw / w);
+    });
+
+    // ─── Шаг 4: считаем, сколько footer-фрагментов влезает на стр1 ───────
+    const BOTTOM_PAD = 25;  // отступ между контентом и первым footer-фрагментом
+    const FOOTER_GAP = 25;  // отступ между footer-фрагментами (как в референсе)
+    let availableForFooter = PAGE_H - headerH_px - contentH_px - BOTTOM_PAD;
+
+    let footerOnP1 = 0;
+    let accumulated = 0;
+    for (let i = 0; i < footerDisplayHeights.length; i++) {
+        if (!footerDisplayHeights[i]) continue;
+        const gap = footerOnP1 > 0 ? FOOTER_GAP : 0;
+        if (accumulated + gap + footerDisplayHeights[i] <= availableForFooter) {
+            accumulated += gap + footerDisplayHeights[i];
+            footerOnP1 = i + 1;
+        } else {
+            break;
+        }
+    }
+    const footerOnP2 = FOOTER_N - footerOnP1;
+
+    // Генератор HTML для footer-фрагментов.
+    // Изображения отображаются в размере natural/1.5, но не шире contentWidth.
+    // Контейнер с боковыми паддингами PAD px. Между фрагментами отступ FOOTER_GAP px.
+    const makeFooterImgsHTML = (from, count) => {
+        const items = footerSrcs.slice(from, from + count)
+            .map((src, idx) => {
+                const nat = footerNaturalSizes[from + idx];
+                const imgW = nat && nat.w
+                    ? Math.min(Math.round(nat.w / FOOTER_SCALE), contentWidth)
+                    : contentWidth;
+                const isLast = (idx === count - 1);
+                return `<div style="margin-bottom:${isLast ? 0 : FOOTER_GAP}px;">
+                    <img src="${src}" crossorigin="anonymous"
+                        style="display:block; width:${imgW}px; height:auto;">
+                </div>`;
+            })
+            .join('');
+        return `<div style="padding:0 ${PAD}px; box-sizing:border-box;">${items}</div>`;
+    };
+
+    // ─── Шаг 5: рендерим контент страницы 1 ──────────────────────────────
+    const divContent1 = document.createElement('div');
+    divContent1.style.cssText = `width:${PAGE_W}px;background:#fff;`;
+    divContent1.innerHTML = `
+        <div style="padding:20px ${PAD}px 10px;${MF}">
+            <h2 style="color:#FF5D5B;font-size:15px;margin:0 0 10px 0;font-weight:800;">Стоимость подключения:</h2>
+            <table style="width:100%;border-collapse:collapse;"><tbody>${lines.map(rowHTML).join('')}</tbody></table>
+            ${summaryHTML()}
+            ${contactHTML()}
+        </div>
+        ${footerOnP1 > 0 ? `<div style="margin-top:${BOTTOM_PAD}px;">${makeFooterImgsHTML(0, footerOnP1)}</div>` : ''}
+    `;
     mount(divContent1);
+    await Promise.all(Array.from(divContent1.querySelectorAll('img')).map(waitImg));
     await new Promise(r => setTimeout(r, 150));
     const canvasContent1 = await toCanvas(divContent1);
     unmount(divContent1);
 
-    // ── СТРАНИЦА 2 (если нужна) ──
+    // ─── Шаг 6: рендерим страницу 2 (оставшиеся footer-фрагменты) ────────
     let canvas2 = null;
-    if (finalNeedP2) {
+    if (footerOnP2 > 0) {
         const div2 = document.createElement('div');
-        div2.style.cssText = `width:${PAGE_W}px;background:#fff;${MF}`;
-        const content2 = document.createElement('div');
-        content2.style.cssText = `padding:40px ${PAD}px 20px;`;
-        content2.innerHTML = `
-            ${rows2.length ? `<table style="width:100%;border-collapse:collapse;"><tbody>${rows2.map(rowHTML).join('')}</tbody></table>${summaryHTML()}` : ''}
-            ${contactHTML()}
-        `;
-        div2.appendChild(content2);
-        if (footerSrc) {
-            const footerWrap = document.createElement('div');
-            footerWrap.style.cssText = `width:${PAGE_W}px;padding-top:20px;`;
-            const fImg = document.createElement('img');
-            fImg.src = footerSrc;
-            fImg.style.cssText = `width:${PAGE_W}px;display:block;`;
-            footerWrap.appendChild(fImg);
-            div2.appendChild(footerWrap);
-        }
+        div2.style.cssText = `width:${PAGE_W}px;background:#fff;padding-top:40px;`;
+        div2.innerHTML = makeFooterImgsHTML(footerOnP1, footerOnP2);
         mount(div2);
         await Promise.all(Array.from(div2.querySelectorAll('img')).map(waitImg));
         await new Promise(r => setTimeout(r, 150));
@@ -634,44 +657,21 @@ async function buildPDF() {
         unmount(div2);
     }
 
-    // ── Если всё влезло на стр1 — footer отдельной страницей ──
-    let canvasLast = null;
-    if (!finalNeedP2) {
-        const divLast = document.createElement('div');
-        divLast.style.cssText = `width:${PAGE_W}px;background:#fff;${MF}padding-top:20px;`;
-        if (footerSrc) {
-            const img = document.createElement('img');
-            img.src = footerSrc;
-            img.style.cssText = `width:${PAGE_W}px;display:block;`;
-            divLast.appendChild(img);
-        }
-        mount(divLast);
-        await Promise.all(Array.from(divLast.querySelectorAll('img')).map(waitImg));
-        await new Promise(r => setTimeout(r, 150));
-        canvasLast = await toCanvas(divLast);
-        unmount(divLast);
-    }
-
-    // ── Сборка PDF ──
+    // ─── Шаг 7: собираем PDF ──────────────────────────────────────────────
     const pdf = new jsPDFClass({ unit:'pt', format:'a4', orientation:'portrait' });
     const PW = pdf.internal.pageSize.getWidth();   // 595.28pt
-    const PH = pdf.internal.pageSize.getHeight();  // 841.89pt
 
-    // Страница 1: header вверху в натуральный размер, контент сразу под ним
-    const headerH_pt = PW * (canvasHeader.height / canvasHeader.width);
-    pdf.addImage(canvasHeader.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, PW, headerH_pt);
+    // Страница 1
+    const headerH_pt   = PW * (canvasHeader.height / canvasHeader.width);
     const content1H_pt = PW * (canvasContent1.height / canvasContent1.width);
-    pdf.addImage(canvasContent1.toDataURL('image/jpeg', 1.0), 'JPEG', 0, headerH_pt, PW, content1H_pt);
+    pdf.addImage(canvasHeader.toDataURL('image/jpeg', 1.0),    'JPEG', 0, 0,          PW, headerH_pt);
+    pdf.addImage(canvasContent1.toDataURL('image/jpeg', 1.0), 'JPEG',  0, headerH_pt, PW, content1H_pt);
 
-    // Страница 2 и последняя
-    const addPage = (canvas) => {
+    // Страница 2 (если нужна)
+    if (canvas2) {
         pdf.addPage();
-        const ratio = canvas.height / canvas.width;
-        pdf.addImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, PW, PW * ratio);
-    };
-
-    if (canvas2) addPage(canvas2);
-    if (canvasLast) addPage(canvasLast);
+        pdf.addImage(canvas2.toDataURL('image/jpeg', 1.0), 'JPEG',  0, 0, PW, PW * (canvas2.height / canvas2.width));
+    }
 
     const safe = clientName.replace(/[^а-яёА-ЯЁa-zA-Z0-9 _-]/g, '').trim();
     pdf.save(safe ? `КП_1С_Отчетность_${safe}.pdf` : 'КП_1С_Отчетность.pdf');
