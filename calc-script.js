@@ -64,9 +64,9 @@ const STATE = {
     isGroup: false,
     mode: 'fast',
     existingCount: 0,
-    solo: { region: '', ownership: 'ul', duration: '1', employees: 1 },
+    solo: { region: '', ownership: 'ul', duration: '1', employees: 1, multiMonths: 12 },
     fastRows: [{ id: Date.now(), region: '', ulCount: 1, ipCount: 0 }],
-    detailedCompanies: [{ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none' }],
+    detailedCompanies: [{ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none', multiMonths: 12 }],
     manualDiscount: { type: 'percent', value: 0 },
     addons: {},
     customPrices: {}
@@ -78,6 +78,32 @@ CONFIG.globalAddons.forEach(g => {
 });
 
 const formatPrice = (v) => Math.round(v).toLocaleString('ru-RU') + ' ₽';
+
+// Разбирает значение поля: число месяцев или дата (вычисляет месяцы от сегодня)
+function parseMultiMonths(val) {
+    if (!val || val === '') return 12;
+    const s = val.toString().trim();
+    // Дата в формате DD.MM.YYYY или YYYY-MM-DD или MM/DD/YYYY
+    const dateMatch = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/) || s.match(/^(\d{4})-(\d{2})-(\d{2})$/) || s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (dateMatch) {
+        let target;
+        if (s.includes('.')) {
+            const [, d, m, y] = dateMatch;
+            target = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+        } else if (s.includes('-')) {
+            const [, y, m, d] = dateMatch;
+            target = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+        } else {
+            const [, m, d, y] = dateMatch;
+            target = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+        }
+        const now = new Date();
+        const months = (target.getFullYear() - now.getFullYear()) * 12 + (target.getMonth() - now.getMonth());
+        return Math.max(1, months);
+    }
+    const n = parseInt(s);
+    return isNaN(n) || n < 1 ? 12 : n;
+}
 
 const getPrice = (tariff, configKey) => {
     const columnName = CONFIG.columns[configKey];
@@ -195,6 +221,19 @@ function renderSoloMode(container) {
         empInput.value = STATE.solo.employees;
         empInput.oninput = (e) => CalcApp.updateSolo('employees', e.target.value);
     }
+
+    // Поле месяцев МР — добавляем в fragment до вставки в DOM
+    const empCount2 = (STATE.solo.employees === "" || STATE.solo.employees === 0) ? 1 : parseInt(STATE.solo.employees) || 1;
+    const mrRow = document.createElement('div');
+    mrRow.id = 'calc-solo-mr-months-row';
+    mrRow.className = 'calc-form-row';
+    mrRow.style.cssText = 'margin-top:10px; display:' + (empCount2 >= 2 ? 'block' : 'none') + ';';
+    const mrVal = (STATE.solo.multiMonths === 12 || STATE.solo.multiMonths === '12') ? '' : STATE.solo.multiMonths;
+    mrRow.innerHTML = '<label>Количество месяцев или дата до которой подключается услуга</label>' +
+        '<input type="text" id="calc-solo-mr-months" placeholder="12 или 31.12.2026" value="' + mrVal + '" ' +
+        'style="max-width:260px;" oninput="CalcApp.updateSoloMultiMonths(this.value)">';
+    content.appendChild(mrRow);
+
     container.appendChild(content);
 }
 
@@ -256,6 +295,19 @@ function renderDetailedMode(container, showExisting) {
             if (btn.dataset.val === comp.multiUser) btn.classList.add('calc-selected');
             btn.onclick = () => CalcApp.toggleOption(comp.id, 'multiUser', btn.dataset.val);
         });
+
+        // Поле месяцев МР
+        const multiMonthsRow = document.createElement('div');
+        multiMonthsRow.className = 'calc-multi-months-row';
+        multiMonthsRow.style.cssText = `margin-top:10px; display:${comp.multiUser !== 'none' ? 'block' : 'none'};`;
+        multiMonthsRow.innerHTML = `
+            <div style="font-size:10px;color:#999;margin-bottom:4px;font-weight:700;">КОЛИЧЕСТВО МЕСЯЦЕВ ИЛИ ДАТА ДО КОТОРОЙ ПОДКЛЮЧАЕТСЯ УСЛУГА</div>
+            <input type="text" placeholder="12 или дата дд.мм.гггг"
+                value="${comp.multiMonths === 12 ? '' : comp.multiMonths}"
+                style="max-width:220px;padding:8px 12px;border:1px solid #e1e8ed;border-radius:10px;font-family:Montserrat,sans-serif;font-size:13px;"
+                oninput="CalcApp.updateDet(${comp.id}, 'multiMonths', this.value, false)">`;
+        const cardEl = cardContent.querySelector('.calc-company-card');
+        if (cardEl) cardEl.appendChild(multiMonthsRow);
         if (idx > 0) {
             const delBtn = cardContent.querySelector('.calc-remove-card-btn');
             if (delBtn) { delBtn.style.display = 'block'; delBtn.onclick = () => CalcApp.removeDet(comp.id); }
@@ -340,9 +392,12 @@ function calculate() {
             if (empCount >= 2 && empCount <= 9) multiKey = 'multi_small';
             else if (empCount >= 10) multiKey = 'multi_large';
             if (multiKey) {
-                const pMulti = getPrice(t, multiKey);
+                const pMultiYear = getPrice(t, multiKey);
+                const months = parseMultiMonths(STATE.solo.multiMonths);
+                const pMulti = Math.round(pMultiYear / 12 * months);
                 total += pMulti;
-                logs.push(`${CONFIG.extraServices.find(s => s.col === multiKey).label} | ${formatPrice(pMulti)}`);
+                const label = CONFIG.extraServices.find(s => s.col === multiKey).label;
+                logs.push(`${label} (${months} мес.) | ${formatPrice(pMulti)}`);
             }
         }
     } else {
@@ -382,9 +437,16 @@ function calculate() {
                 total += pGK; discCurrentTotal += pGK; discBaseTotal += pBase;
                 CONFIG.extraServices.forEach(srv => {
                     if (c[srv.key] === srv.val) {
-                        const srvPrice = getPrice(t, srv.col);
+                        const srvPriceYear = getPrice(t, srv.col);
+                        let srvPrice = srvPriceYear;
+                        let monthsLabel = '';
+                        if (srv.key === 'multiUser') {
+                            const months = parseMultiMonths(c.multiMonths);
+                            srvPrice = Math.round(srvPriceYear / 12 * months);
+                            monthsLabel = ` (${months} мес.)`;
+                        }
                         total += srvPrice;
-                        logs.push(`      ${compName} - ${srv.label} | ${formatPrice(srvPrice)}`);
+                        logs.push(`      ${compName} - ${srv.label}${monthsLabel} | ${formatPrice(srvPrice)}`);
                     }
                 });
             });
@@ -435,7 +497,6 @@ function getGroupColumnKey(n) {
 }
 
 // ─── PDF ──────────────────────────────────────────────────────────────────
-
 function initPDF() {
     const pdfBtn = document.getElementById('calc-generate-pdf');
     if (!pdfBtn) return;
@@ -450,15 +511,16 @@ function initPDF() {
 
 async function buildPDF() {
     const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-    if (!jsPDFClass) throw new Error('jsPDF не найден. Проверьте подключение скрипта jspdf.umd.min.js');
+    if (!jsPDFClass) throw new Error('jsPDF не найден');
     if (typeof html2canvas === 'undefined') throw new Error('html2canvas не найден');
 
-    const PAGE_W  = 794;   // ширина страницы в px (DOM)
-    const PAGE_H  = 1122;  // высота страницы A4 в px (DOM)
-    const PAD     = 50;    // горизонтальный отступ контента
+    const PAGE_W  = 794;
+    const PAGE_H  = 1122;
+    const PAD     = 50;
     const MF      = "font-family:'Montserrat',sans-serif;box-sizing:border-box;";
+    const BOTTOM_PAD = 25;
+    const FOOTER_GAP = 25;
 
-    // ─── Данные ──────────────────────────────────────────────────────────
     const totalText    = document.getElementById('calc-total-price')?.innerText || '';
     const discEl       = document.getElementById('calc-discount-info');
     const discText     = (discEl && discEl.offsetParent !== null) ? discEl.innerText.replace('ⓘ','').trim() : '';
@@ -469,13 +531,16 @@ async function buildPDF() {
     const lines        = (document.getElementById('calc-details-content')?.innerText || '')
         .split('\n').map(s => s.trim()).filter(Boolean);
 
-    // Пути к изображениям — footer нумерованные, рядом с html
-    const headerSrc  = CONFIG.getAssetPath('header');
-    const baseDir    = headerSrc ? headerSrc.replace(/[^/\\]*$/, '') : '';
-    const FOOTER_N   = 6;
-    const footerSrcs = Array.from({length: FOOTER_N}, (_, i) => `${baseDir}pdf-footer-${i+1}.jpg`);
+    const assets = document.getElementById('calc-assets');
+    if (!assets) throw new Error('Элемент #calc-assets не найден в DOM');
 
-    // ─── Helpers ─────────────────────────────────────────────────────────
+    const headerSrc = assets.dataset.headerSrc || '';
+    const footerSrcs = [];
+    for (let i = 1; i <= 6; i++) {
+        const src = assets.getAttribute(`data-footer-src-${i}`);
+        if (src) footerSrcs.push(src);
+    }
+
     const waitImg = img => new Promise(res => {
         if (!img.src) { res(); return; }
         if (img.complete && img.naturalHeight > 0) { res(); return; }
@@ -493,6 +558,15 @@ async function buildPDF() {
         scale: 5, useCORS: true, allowTaint: true, logging: false,
         width: PAGE_W, windowWidth: PAGE_W
     });
+    const measureHeight = html => {
+        const div = document.createElement('div');
+        div.style.cssText = `width:${PAGE_W}px;position:absolute;top:0;left:-9999px;visibility:hidden;`;
+        div.innerHTML = html;
+        document.body.appendChild(div);
+        const h = div.getBoundingClientRect().height;
+        document.body.removeChild(div);
+        return h;
+    };
 
     const rowHTML = line => {
         if (!line.includes('|'))
@@ -530,86 +604,9 @@ async function buildPDF() {
         </div>`;
     };
 
-    // Измеряем высоту произвольного HTML в контейнере шириной PAGE_W
-    const measureHeight = html => {
-        const div = document.createElement('div');
-        div.style.cssText = `width:${PAGE_W}px;position:absolute;top:0;left:-9999px;visibility:hidden;`;
-        div.innerHTML = html;
-        document.body.appendChild(div);
-        const h = div.getBoundingClientRect().height;
-        document.body.removeChild(div);
-        return h;
-    };
-
-    // ─── Шаг 1: рендерим header ───────────────────────────────────────────
-    const divHeader = document.createElement('div');
-    divHeader.style.cssText = `width:${PAGE_W}px;background:#fff;`;
-    if (headerSrc) {
-        const img = document.createElement('img');
-        img.src = headerSrc;
-        // Header растягиваем на всю ширину страницы
-        img.style.cssText = `width:${PAGE_W}px;display:block;`;
-        divHeader.appendChild(img);
-    }
-    mount(divHeader);
-    await Promise.all(Array.from(divHeader.querySelectorAll('img')).map(waitImg));
-    await new Promise(r => setTimeout(r, 100));
-    const canvasHeader = await toCanvas(divHeader);
-    unmount(divHeader);
-
-    // Высота header в DOM-пикселях (при scale=1)
-    const headerH_px = Math.round(PAGE_W * canvasHeader.height / canvasHeader.width);
-
-    // ─── Шаг 2: измеряем высоту контента (таблица + итог + контакты) ─────
-    const contentBodyHTML = `<div style="padding:20px ${PAD}px 10px;${MF}">
-        <h2 style="color:#FF5D5B;font-size:15px;margin:0 0 10px 0;font-weight:800;">Стоимость подключения:</h2>
-        <table style="width:100%;border-collapse:collapse;"><tbody>${lines.map(rowHTML).join('')}</tbody></table>
-        ${summaryHTML()}
-        ${contactHTML()}
-    </div>`;
-    const contentH_px = measureHeight(contentBodyHTML);
-
-    // ─── Шаг 3: предзагружаем footer-изображения ─────────────────────────
-    // Footer: натуральный размер / 1.5 (изображения созданы при DPR=1.5),
-    // но не шире contentWidth. Отображаются с паддингом PAD с каждой стороны.
-    const contentWidth = PAGE_W - PAD * 2; // 694px
-    const FOOTER_SCALE = 1.5;
-
-    const footerNaturalSizes = await Promise.all(footerSrcs.map(src => new Promise(res => {
-        const img = new Image();
-        img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight, ok: true });
-        img.onerror = () => res({ w: 0, h: 0, ok: false });
-        img.src = src;
-    })));
-    const footerDisplayHeights = footerNaturalSizes.map(({ w, h }) => {
-        if (!w) return 0;
-        const dw = Math.min(Math.round(w / FOOTER_SCALE), contentWidth);
-        return Math.round(h * dw / w);
-    });
-
-    // ─── Шаг 4: считаем, сколько footer-фрагментов влезает на стр1 ───────
-    const BOTTOM_PAD = 25;  // отступ между контентом и первым footer-фрагментом
-    const FOOTER_GAP = 25;  // отступ между footer-фрагментами (как в референсе)
-    let availableForFooter = PAGE_H - headerH_px - contentH_px - BOTTOM_PAD;
-
-    let footerOnP1 = 0;
-    let accumulated = 0;
-    for (let i = 0; i < footerDisplayHeights.length; i++) {
-        if (!footerDisplayHeights[i]) continue;
-        const gap = footerOnP1 > 0 ? FOOTER_GAP : 0;
-        if (accumulated + gap + footerDisplayHeights[i] <= availableForFooter) {
-            accumulated += gap + footerDisplayHeights[i];
-            footerOnP1 = i + 1;
-        } else {
-            break;
-        }
-    }
-    const footerOnP2 = FOOTER_N - footerOnP1;
-
-    // Генератор HTML для footer-фрагментов.
-    // Изображения отображаются в размере natural/1.5, но не шире contentWidth.
-    // Контейнер с боковыми паддингами PAD px. Между фрагментами отступ FOOTER_GAP px.
     const makeFooterImgsHTML = (from, count) => {
+        const contentWidth = PAGE_W - PAD * 2;
+        const FOOTER_SCALE = 1.5;
         const items = footerSrcs.slice(from, from + count)
             .map((src, idx) => {
                 const nat = footerNaturalSizes[from + idx];
@@ -618,70 +615,234 @@ async function buildPDF() {
                     : contentWidth;
                 const isLast = (idx === count - 1);
                 return `<div style="margin-bottom:${isLast ? 0 : FOOTER_GAP}px;">
-                    <img src="${src}" crossorigin="anonymous"
-                        style="display:block; width:${imgW}px; height:auto;">
+                    <img src="${src}" crossorigin="anonymous" style="display:block;width:${imgW}px;height:auto;">
                 </div>`;
-            })
-            .join('');
-        return `<div style="padding:0 ${PAD}px; box-sizing:border-box;">${items}</div>`;
+            }).join('');
+        return `<div style="padding:0 ${PAD}px;box-sizing:border-box;">${items}</div>`;
     };
 
-    // ─── Шаг 5: рендерим контент страницы 1 ──────────────────────────────
-    const divContent1 = document.createElement('div');
-    divContent1.style.cssText = `width:${PAGE_W}px;background:#fff;`;
-    divContent1.innerHTML = `
-        <div style="padding:20px ${PAD}px 10px;${MF}">
-            <h2 style="color:#FF5D5B;font-size:15px;margin:0 0 10px 0;font-weight:800;">Стоимость подключения:</h2>
-            <table style="width:100%;border-collapse:collapse;"><tbody>${lines.map(rowHTML).join('')}</tbody></table>
-            ${summaryHTML()}
-            ${contactHTML()}
-        </div>
-        ${footerOnP1 > 0 ? `<div style="margin-top:${BOTTOM_PAD}px;">${makeFooterImgsHTML(0, footerOnP1)}</div>` : ''}
-    `;
-    mount(divContent1);
-    await Promise.all(Array.from(divContent1.querySelectorAll('img')).map(waitImg));
-    await new Promise(r => setTimeout(r, 150));
-    const canvasContent1 = await toCanvas(divContent1);
-    unmount(divContent1);
+    // ─── Header ───────────────────────────────────────────────────────────
+    const divHeader = document.createElement('div');
+    divHeader.style.cssText = `width:${PAGE_W}px;background:#fff;`;
+    if (headerSrc) {
+        const img = document.createElement('img');
+        img.src = headerSrc;
+        img.style.cssText = `width:${PAGE_W}px;display:block;`;
+        divHeader.appendChild(img);
+    }
+    mount(divHeader);
+    await Promise.all(Array.from(divHeader.querySelectorAll('img')).map(waitImg));
+    await new Promise(r => setTimeout(r, 100));
+    const canvasHeader = await toCanvas(divHeader);
+    unmount(divHeader);
+    const headerH_px = Math.round(PAGE_W * canvasHeader.height / canvasHeader.width);
 
-    // ─── Шаг 6: рендерим страницу 2 (оставшиеся footer-фрагменты) ────────
-    let canvas2 = null;
-    if (footerOnP2 > 0) {
-        const div2 = document.createElement('div');
-        div2.style.cssText = `width:${PAGE_W}px;background:#fff;padding-top:40px;`;
-        div2.innerHTML = makeFooterImgsHTML(footerOnP1, footerOnP2);
-        mount(div2);
-        await Promise.all(Array.from(div2.querySelectorAll('img')).map(waitImg));
-        await new Promise(r => setTimeout(r, 150));
-        canvas2 = await toCanvas(div2);
-        unmount(div2);
+    // ─── Предзагрузка футеров ─────────────────────────────────────────────
+    const contentWidth = PAGE_W - PAD * 2;
+    const FOOTER_SCALE = 1.5;
+    const footerNaturalSizes = await Promise.all(footerSrcs.map(src => new Promise(res => {
+        const img = new Image();
+        img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight });
+        img.onerror = () => res({ w: 0, h: 0 });
+        img.src = src;
+    })));
+    const footerDisplayHeights = footerNaturalSizes.map(({ w, h }) => {
+        if (!w) return 0;
+        const dw = Math.min(Math.round(w / FOOTER_SCALE), contentWidth);
+        return Math.round(h * dw / w);
+    });
+
+    // ─── Измеряем блоки ───────────────────────────────────────────────────
+    const titleHTML = `<div style="padding:20px ${PAD}px 0;${MF}">
+        <h2 style="color:#FF5D5B;font-size:15px;margin:0 0 10px 0;font-weight:800;">Стоимость подключения:</h2>
+    </div>`;
+    const titleH = measureHeight(titleHTML);
+
+    const rowHeights = lines.map(line => measureHeight(
+        `<div style="width:${PAGE_W}px;padding:0 ${PAD}px;box-sizing:border-box;${MF}">
+            <table style="width:100%;border-collapse:collapse;"><tbody>${rowHTML(line)}</tbody></table>
+        </div>`
+    ));
+
+    // Измеряем итог и контакты по отдельности
+    const summaryOnlyHTML = `<div style="padding:0 ${PAD}px 10px;${MF}">${summaryHTML()}</div>`;
+    const contactOnlyHTML = contactHTML()
+        ? `<div style="padding:0 ${PAD}px 10px;${MF}">${contactHTML()}</div>`
+        : '';
+    const summaryBlockHTML = `<div style="padding:0 ${PAD}px 10px;${MF}">${summaryHTML()}${contactHTML()}</div>`;
+
+    const summaryOnlyH  = measureHeight(summaryOnlyHTML);
+    const contactOnlyH  = contactOnlyHTML ? measureHeight(contactOnlyHTML) : 0;
+    const summaryBlockH = summaryOnlyH + contactOnlyH;
+
+    const availableP1   = PAGE_H - headerH_px - 30;
+    const availableRest = PAGE_H - 30;
+
+    // ─── Разбиваем строки по страницам ────────────────────────────────────
+    // summaryOnThisPage: false | 'full' | 'summary-only' | 'contact-only'
+    const pages = [];
+    let remaining = [...lines];
+    let isFirstPage = true;
+
+    while (remaining.length > 0 || pages.length === 0) {
+        const available = isFirstPage ? availableP1 : availableRest;
+        const overhead  = isFirstPage ? titleH : 30;
+        let used = overhead;
+        const pageLines = [];
+
+        for (let i = 0; i < remaining.length; i++) {
+            if (used + rowHeights[lines.length - remaining.length + i] <= available) {
+                used += rowHeights[lines.length - remaining.length + i];
+                pageLines.push(remaining[i]);
+            } else {
+                break;
+            }
+        }
+
+        // защита от бесконечного цикла
+        if (pageLines.length === 0 && remaining.length > 0) {
+            pageLines.push(remaining[0]);
+            used += rowHeights[lines.length - remaining.length];
+        }
+
+        remaining = remaining.slice(pageLines.length);
+        const isLast = remaining.length === 0;
+
+        // На последней странице со строками — проверяем что влезает
+        let summaryOnThisPage = false;
+        if (isLast) {
+            if (used + summaryBlockH <= available) {
+                // Влезает всё целиком
+                summaryOnThisPage = 'full';
+            } else if (used + summaryOnlyH <= available) {
+                // Влезает только итог, контакты уйдут отдельно
+                summaryOnThisPage = 'summary-only';
+            }
+            // Иначе false — ничего не влезло, всё на следующую страницу
+        }
+
+        const addedH = summaryOnThisPage === 'full' ? summaryBlockH
+                     : summaryOnThisPage === 'summary-only' ? summaryOnlyH
+                     : 0;
+
+        pages.push({ lines: pageLines, isFirst: isFirstPage, isLast, summaryOnThisPage, usedH: used + addedH });
+        isFirstPage = false;
+
+        if (isLast) break;
     }
 
-    // ─── Шаг 7: собираем PDF ──────────────────────────────────────────────
+    // Добавляем страницы для итого/контактов если не влезли
+    const lastPage = pages[pages.length - 1];
+
+    if (!lastPage.summaryOnThisPage) {
+        // Ничего не влезло — проверяем влезут ли вместе на новой странице
+        if (summaryBlockH + 30 <= availableRest) {
+            pages.push({ lines: [], isFirst: false, isLast: true, summaryOnThisPage: 'full', usedH: summaryBlockH + 30 });
+        } else {
+            // Не влезают даже вместе — итог отдельно, контакты отдельно
+            pages.push({ lines: [], isFirst: false, isLast: false, summaryOnThisPage: 'summary-only', usedH: summaryOnlyH + 30 });
+            if (contactOnlyHTML) {
+                pages.push({ lines: [], isFirst: false, isLast: true, summaryOnThisPage: 'contact-only', usedH: contactOnlyH + 30 });
+            }
+        }
+    } else if (lastPage.summaryOnThisPage === 'summary-only' && contactOnlyHTML) {
+        // Итог влез, контакты не влезли — добавляем страницу для контактов
+        pages.push({ lines: [], isFirst: false, isLast: true, summaryOnThisPage: 'contact-only', usedH: contactOnlyH + 30 });
+    }
+
+    // ─── Считаем футер ─────────────────────────────────────────────────────
+    const finalPage = pages[pages.length - 1];
+    const availableForFooter = (finalPage.isFirst ? availableP1 : availableRest) - finalPage.usedH - BOTTOM_PAD;
+
+    let footerOnLastPage = 0, accumulated = 0;
+    for (let i = 0; i < footerDisplayHeights.length; i++) {
+        if (!footerDisplayHeights[i]) continue;
+        const gap = footerOnLastPage > 0 ? FOOTER_GAP : 0;
+        if (accumulated + gap + footerDisplayHeights[i] <= availableForFooter) {
+            accumulated += gap + footerDisplayHeights[i];
+            footerOnLastPage = i + 1;
+        } else break;
+    }
+    const footerOnExtraPage = footerSrcs.length - footerOnLastPage;
+
+    // ─── Рендерим каждую страницу ──────────────────────────────────────────
+    const canvases = [];
+
+    for (let pi = 0; pi < pages.length; pi++) {
+        const pg = pages[pi];
+        const isLastPage = pi === pages.length - 1;
+        const div = document.createElement('div');
+        div.style.cssText = `width:${PAGE_W}px;background:#fff;`;
+
+        const tableRows = pg.lines.map(rowHTML).join('');
+        const tableHTML = tableRows ? `
+            <div style="padding:${pg.isFirst ? '20px' : '30px'} ${PAD}px 0;${MF}">
+                ${pg.isFirst ? `<h2 style="color:#FF5D5B;font-size:15px;margin:0 0 10px 0;font-weight:800;">Стоимость подключения:</h2>` : ''}
+                <table style="width:100%;border-collapse:collapse;">
+                    <tbody>${tableRows}</tbody>
+                </table>
+            </div>` : '';
+
+        const summaryRendered =
+            pg.summaryOnThisPage === 'full'         ? summaryBlockHTML :
+            pg.summaryOnThisPage === 'summary-only' ? summaryOnlyHTML  :
+            pg.summaryOnThisPage === 'contact-only' ? contactOnlyHTML  : '';
+
+        const footerHTML = isLastPage && footerOnLastPage > 0
+            ? `<div style="margin-top:${BOTTOM_PAD}px;">${makeFooterImgsHTML(0, footerOnLastPage)}</div>`
+            : '';
+
+        div.innerHTML = tableHTML + summaryRendered + footerHTML;
+
+        mount(div);
+        await Promise.all(Array.from(div.querySelectorAll('img')).map(waitImg));
+        await new Promise(r => setTimeout(r, 150));
+        canvases.push(await toCanvas(div));
+        unmount(div);
+    }
+
+    // Доп. страница с оставшимся футером
+    let canvasExtraFooter = null;
+    if (footerOnExtraPage > 0) {
+        const divF = document.createElement('div');
+        divF.style.cssText = `width:${PAGE_W}px;background:#fff;padding-top:40px;box-sizing:border-box;`;
+        divF.innerHTML = makeFooterImgsHTML(footerOnLastPage, footerOnExtraPage);
+        mount(divF);
+        await Promise.all(Array.from(divF.querySelectorAll('img')).map(waitImg));
+        await new Promise(r => setTimeout(r, 150));
+        canvasExtraFooter = await toCanvas(divF);
+        unmount(divF);
+    }
+
+    // ─── Сборка PDF ────────────────────────────────────────────────────────
     const pdf = new jsPDFClass({ unit:'pt', format:'a4', orientation:'portrait' });
-    const PW = pdf.internal.pageSize.getWidth();   // 595.28pt
+    const PW  = pdf.internal.pageSize.getWidth();
 
-    // Страница 1
-    const headerH_pt   = PW * (canvasHeader.height / canvasHeader.width);
-    const content1H_pt = PW * (canvasContent1.height / canvasContent1.width);
-    pdf.addImage(canvasHeader.toDataURL('image/jpeg', 1.0),    'JPEG', 0, 0,          PW, headerH_pt);
-    pdf.addImage(canvasContent1.toDataURL('image/jpeg', 1.0), 'JPEG',  0, headerH_pt, PW, content1H_pt);
+    const headerH_pt = PW * (canvasHeader.height / canvasHeader.width);
+    pdf.addImage(canvasHeader.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, PW, headerH_pt);
+    pdf.addImage(canvases[0].toDataURL('image/jpeg', 1.0), 'JPEG', 0, headerH_pt, PW,
+        PW * (canvases[0].height / canvases[0].width));
 
-    // Страница 2 (если нужна)
-    if (canvas2) {
+    for (let i = 1; i < canvases.length; i++) {
         pdf.addPage();
-        pdf.addImage(canvas2.toDataURL('image/jpeg', 1.0), 'JPEG',  0, 0, PW, PW * (canvas2.height / canvas2.width));
+        pdf.addImage(canvases[i].toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, PW,
+            PW * (canvases[i].height / canvases[i].width));
+    }
+
+    if (canvasExtraFooter) {
+        pdf.addPage();
+        pdf.addImage(canvasExtraFooter.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, PW,
+            PW * (canvasExtraFooter.height / canvasExtraFooter.width));
     }
 
     const safe = clientName.replace(/[^а-яёА-ЯЁa-zA-Z0-9 _-]/g, '').trim();
     pdf.save(safe ? `КП_1С_Отчетность_${safe}.pdf` : 'КП_1С_Отчетность.pdf');
 }
-
 // ─── ПУБЛИЧНЫЙ API ────────────────────────────────────────────────────────
 
 const CalcApp = {
     updateSolo: (f, v) => {
-        if (f === 'employees') { STATE.solo.employees = v === "" ? "" : Math.max(0, parseInt(v) || 0); calculate(); }
+        if (f === 'employees') { STATE.solo.employees = v === "" ? "" : Math.max(0, parseInt(v) || 0); render(); }
         else { STATE.solo[f] = v; render(); }
     },
     addFastRow: () => { STATE.fastRows.push({ id: Date.now(), region: '', ulCount: 1, ipCount: 0 }); render(); },
@@ -694,7 +855,7 @@ const CalcApp = {
         if (STATE.fastRows.length > 1) { STATE.fastRows = STATE.fastRows.filter(x => x.id != id); render(); }
     },
     addDetailedCompany: () => {
-        STATE.detailedCompanies.push({ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none' });
+        STATE.detailedCompanies.push({ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none', multiMonths: 12 });
         render();
     },
     updateDet: (id, f, v, redraw = true) => {
@@ -732,7 +893,10 @@ const CalcApp = {
     },
     updateSoloEmployees: (val) => {
         const clean = val.toString().replace(/\D/g, '');
-        STATE.solo.employees = clean === "" ? "" : parseInt(clean);
+        CalcApp.updateSolo('employees', clean === "" ? "" : parseInt(clean) || 0);
+    },
+    updateSoloMultiMonths: (val) => {
+        STATE.solo.multiMonths = val === '' ? 12 : val;
         calculate();
     }
 };
