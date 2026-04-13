@@ -148,14 +148,27 @@
             <button class="calc-toggle-btn" data-val="2">2 года</button>
         </div></div>
     </div>
-    <div class="calc-form-row" style="margin-top:15px;">
-        <label>Сколько сотрудников будут подписывать отчетность своим сертификатом?</label>
-        <input type="number" 
-            id="calc-solo-employees" 
-            min="0" 
-            placeholder="1" 
-            onkeydown="if(['-', 'e', 'E', ',', '.'].includes(event.key)) event.preventDefault();"
-            oninput="window.CalcApp.updateSoloEmployees(this.value)">
+    <div class="calc-grid-adaptive" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+        <div>
+            <div style="font-size: 10px; color: #999; margin-bottom: 4px; font-weight: 700; display: flex; align-items: center; gap: 5px;">
+                ЛИЧНЫЙ КАБИНЕТ
+                <button class="calc-months-hint-btn" onclick="CalcApp.openMonthsCalc('solo','lk')" title="Рассчитать количество месяцев">+</button>
+            </div>
+            <div class="calc-toggle-group" id="calc-solo-lk-group">
+                <button class="calc-toggle-btn" data-val="base">Базовый</button>
+                <button class="calc-toggle-btn" data-val="prof">Проф</button>
+            </div>
+        </div>
+        <div>
+            <div style="font-size: 10px; color: #999; margin-bottom: 4px; font-weight: 700; display: flex; align-items: center; gap: 5px;">
+                МНОГОПОЛЬЗ. РЕЖИМ
+                <button class="calc-months-hint-btn" onclick="CalcApp.openMonthsCalc('solo','multi')" title="Рассчитать количество месяцев">+</button>
+            </div>
+            <div class="calc-toggle-group" id="calc-solo-multi-group">
+                <button class="calc-toggle-btn" data-val="small">2-9</button>
+                <button class="calc-toggle-btn" data-val="large">10+</button>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -194,14 +207,20 @@
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div>
-                <div style="font-size: 10px; color: #999; margin-bottom: 4px; font-weight: 700;">ЛИЧНЫЙ КАБИНЕТ</div>
+                <div style="font-size: 10px; color: #999; margin-bottom: 4px; font-weight: 700; display: flex; align-items: center; gap: 5px;">
+                    ЛИЧНЫЙ КАБИНЕТ
+                    <button class="calc-months-hint-btn calc-months-hint-card-lk" title="Рассчитать количество месяцев">+</button>
+                </div>
                 <div class="calc-toggle-group calc-lk-group">
                     <button class="calc-toggle-btn" data-val="base">Базовый</button>
                     <button class="calc-toggle-btn" data-val="prof">Проф</button>
                 </div>
             </div>
             <div>
-                <div style="font-size: 10px; color: #999; margin-bottom: 4px; font-weight: 700;">МНОГОПОЛЬЗ. РЕЖИМ</div>
+                <div style="font-size: 10px; color: #999; margin-bottom: 4px; font-weight: 700; display: flex; align-items: center; gap: 5px;">
+                    МНОГОПОЛЬЗ. РЕЖИМ
+                    <button class="calc-months-hint-btn calc-months-hint-card-multi" title="Рассчитать количество месяцев">+</button>
+                </div>
                 <div class="calc-toggle-group calc-multi-group">
                     <button class="calc-toggle-btn" data-val="small">2-9</button>
                     <button class="calc-toggle-btn" data-val="large">10+</button>
@@ -212,6 +231,54 @@
         <button class="calc-remove-card-btn" style="position:absolute; top: -10px; right: -10px; background: #fff; border: 1px solid #eee; border-radius: 50%; width: 24px; height: 24px; color: red; cursor: pointer; display: none;">&times;</button>
     </div>
 </template>
+
+    <!-- Модальное окно расчёта месяцев -->
+    <div id="calc-months-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9999; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:20px; padding:28px 28px 24px; max-width:440px; width:92%; box-shadow:0 20px 60px rgba(0,0,0,0.2); font-family:'Montserrat',sans-serif; position:relative; max-height:90vh; overflow-y:auto;">
+            <button onclick="CalcApp.closeMonthsCalc()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#aaa;line-height:1;">×</button>
+            <div style="font-weight:800;font-size:16px;color:#FF5D5B;margin-bottom:4px;">Расчёт стоимости расширения</div>
+            <div id="calc-mc-subtitle" style="font-size:12px;color:#999;margin-bottom:18px;font-weight:600;"></div>
+
+            <!-- Выбор варианта -->
+            <div id="calc-mc-variant-row" style="margin-bottom:16px;">
+                <label style="display:block;font-weight:600;font-size:12px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Вариант</label>
+                <div id="calc-mc-variant-group" style="display:flex;background:#f1f3f5;padding:5px;border-radius:14px;gap:5px;"></div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+                <div>
+                    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Окончание лицензии</label>
+                    <input type="text" id="calc-mc-license-end" placeholder="дд.мм.гггг"
+                        style="width:100%;padding:10px 12px;border:1px solid #e1e8ed;border-radius:10px;font-family:'Montserrat',sans-serif;font-size:13px;box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Дата подключения</label>
+                    <input type="text" id="calc-mc-connect-date" placeholder="дд.мм.гггг"
+                        style="width:100%;padding:10px 12px;border:1px solid #e1e8ed;border-radius:10px;font-family:'Montserrat',sans-serif;font-size:13px;box-sizing:border-box;">
+                </div>
+            </div>
+
+            <button onclick="CalcApp.calcMonths()" style="width:100%;padding:12px;background:#FF5D5B;color:#fff;border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:'Montserrat',sans-serif;margin-bottom:14px;">Рассчитать</button>
+
+            <div id="calc-mc-result" style="display:none;background:#fff8f8;border-radius:12px;padding:14px 18px;margin-bottom:14px;border:1px solid rgba(255,93,91,0.15);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+                    <div>
+                        <div style="font-size:11px;color:#999;margin-bottom:2px;">Месяцев</div>
+                        <div id="calc-mc-months-val" style="font-size:26px;font-weight:800;color:#FF5D5B;"></div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:11px;color:#999;margin-bottom:2px;">Стоимость</div>
+                        <div id="calc-mc-price-val" style="font-size:26px;font-weight:800;color:#333;"></div>
+                        <div id="calc-mc-price-formula" style="font-size:10px;color:#bbb;margin-top:2px;"></div>
+                    </div>
+                </div>
+                <div id="calc-mc-explain" style="font-size:11px;color:#999;margin-top:8px;border-top:1px solid #f0e0e0;padding-top:8px;"></div>
+            </div>
+
+            <button id="calc-mc-apply-btn" onclick="CalcApp.applyMonths()" style="width:100%;padding:12px;background:#27ae60;color:#fff;border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:'Montserrat',sans-serif;display:none;margin-bottom:10px;">Применить к расчёту</button>
+            <button onclick="CalcApp.closeMonthsCalc()" style="width:100%;padding:10px;background:none;border:1px solid #eee;border-radius:12px;font-weight:600;font-size:13px;cursor:pointer;color:#999;font-family:'Montserrat',sans-serif;">← Назад</button>
+        </div>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * КАЛЬКУЛЯТОР 1С-ОТЧЕТНОСТЬ
  * Изолированная версия с глобальным объектом CalcApp
  */
@@ -64,9 +64,9 @@ const STATE = {
     isGroup: false,
     mode: 'fast',
     existingCount: 0,
-    solo: { region: '', ownership: 'ul', duration: '1', employees: 1, multiMonths: 12 },
+    solo: { region: '', ownership: 'ul', duration: '1', lk: 'none', multiUser: 'none', lkMonths: 12, multiMonths: 12 },
     fastRows: [{ id: Date.now(), region: '', ulCount: 1, ipCount: 0 }],
-    detailedCompanies: [{ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none', multiMonths: 12 }],
+    detailedCompanies: [{ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none', multiMonths: 12, lkMonths: 12 }],
     manualDiscount: { type: 'percent', value: 0 },
     addons: {},
     customPrices: {}
@@ -123,6 +123,16 @@ function init() {
         const el = document.getElementById(`calc-${id}`);
         if (saved && el) el.value = saved;
         if (el) el.oninput = (e) => localStorage.setItem(`p-${id}`, e.target.value);
+    });
+
+    // Закрытие модала по клику на фон
+    const modal = document.getElementById('calc-months-modal');
+    if (modal) modal.onclick = (e) => { if (e.target === modal) CalcApp.closeMonthsCalc(); };
+
+    // Enter в полях дат запускает расчёт
+    ['calc-mc-license-end', 'calc-mc-connect-date'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('keydown', (e) => { if (e.key === 'Enter') CalcApp.calcMonths(); });
     });
 
     const savedPrices = localStorage.getItem('my_custom_prices');
@@ -216,23 +226,14 @@ function renderSoloMode(container) {
         if (b.dataset.val === STATE.solo.duration) b.classList.add('calc-selected');
         b.onclick = () => CalcApp.updateSolo('duration', b.dataset.val);
     });
-    const empInput = content.getElementById('calc-solo-employees');
-    if (empInput) {
-        empInput.value = STATE.solo.employees;
-        empInput.oninput = (e) => CalcApp.updateSolo('employees', e.target.value);
-    }
-
-    // Поле месяцев МР — добавляем в fragment до вставки в DOM
-    const empCount2 = (STATE.solo.employees === "" || STATE.solo.employees === 0) ? 1 : parseInt(STATE.solo.employees) || 1;
-    const mrRow = document.createElement('div');
-    mrRow.id = 'calc-solo-mr-months-row';
-    mrRow.className = 'calc-form-row';
-    mrRow.style.cssText = 'margin-top:10px; display:' + (empCount2 >= 2 ? 'block' : 'none') + ';';
-    const mrVal = (STATE.solo.multiMonths === 12 || STATE.solo.multiMonths === '12') ? '' : STATE.solo.multiMonths;
-    mrRow.innerHTML = '<label>Количество месяцев или дата до которой подключается услуга</label>' +
-        '<input type="text" id="calc-solo-mr-months" placeholder="12 или 31.12.2026" value="' + mrVal + '" ' +
-        'style="max-width:260px;" oninput="CalcApp.updateSoloMultiMonths(this.value)">';
-    content.appendChild(mrRow);
+    content.querySelectorAll('#calc-solo-lk-group .calc-toggle-btn').forEach(b => {
+        if (b.dataset.val === STATE.solo.lk) b.classList.add('calc-selected');
+        b.onclick = () => CalcApp.toggleSoloOption('lk', b.dataset.val);
+    });
+    content.querySelectorAll('#calc-solo-multi-group .calc-toggle-btn').forEach(b => {
+        if (b.dataset.val === STATE.solo.multiUser) b.classList.add('calc-selected');
+        b.onclick = () => CalcApp.toggleSoloOption('multiUser', b.dataset.val);
+    });
 
     container.appendChild(content);
 }
@@ -295,6 +296,11 @@ function renderDetailedMode(container, showExisting) {
             if (btn.dataset.val === comp.multiUser) btn.classList.add('calc-selected');
             btn.onclick = () => CalcApp.toggleOption(comp.id, 'multiUser', btn.dataset.val);
         });
+
+        const lkHintBtn = cardContent.querySelector('.calc-months-hint-card-lk');
+        if (lkHintBtn) lkHintBtn.onclick = () => CalcApp.openMonthsCalc('det', 'lk', comp.id);
+        const multiHintBtn = cardContent.querySelector('.calc-months-hint-card-multi');
+        if (multiHintBtn) multiHintBtn.onclick = () => CalcApp.openMonthsCalc('det', 'multi', comp.id);
 
         // Поле месяцев МР
         const multiMonthsRow = document.createElement('div');
@@ -387,18 +393,24 @@ function calculate() {
             const price = getPrice(t, mainPriceKey);
             total += price;
             logs.push(`Лицензия ${isUL ? 'ЮЛ' : 'ИП'}, ${t.Регион}, ${isTwo ? '2 года' : '1 год'} | ${formatPrice(price)}`);
-            const empCount = (STATE.solo.employees === "" || STATE.solo.employees === 0) ? 1 : STATE.solo.employees;
-            let multiKey = null;
-            if (empCount >= 2 && empCount <= 9) multiKey = 'multi_small';
-            else if (empCount >= 10) multiKey = 'multi_large';
-            if (multiKey) {
-                const pMultiYear = getPrice(t, multiKey);
-                const months = parseMultiMonths(STATE.solo.multiMonths);
-                const pMulti = Math.round(pMultiYear / 12 * months);
-                total += pMulti;
-                const label = CONFIG.extraServices.find(s => s.col === multiKey).label;
-                logs.push(`${label} (${months} мес.) | ${formatPrice(pMulti)}`);
-            }
+            CONFIG.extraServices.forEach(srv => {
+                if (STATE.solo[srv.key] === srv.val) {
+                    const srvPriceYear = getPrice(t, srv.col);
+                    let srvPrice = srvPriceYear;
+                    let monthsLabel = '';
+                    if (srv.key === 'multiUser') {
+                        const months = STATE.solo.multiMonths || 12;
+                        srvPrice = Math.round(srvPriceYear / 12 * months);
+                        monthsLabel = ` (${months} мес.)`;
+                    } else if (srv.key === 'lk') {
+                        const months = STATE.solo.lkMonths || 12;
+                        srvPrice = Math.round(srvPriceYear / 12 * months);
+                        monthsLabel = ` (${months} мес.)`;
+                    }
+                    total += srvPrice;
+                    logs.push(`${srv.label}${monthsLabel} | ${formatPrice(srvPrice)}`);
+                }
+            });
         }
     } else {
         const count = (STATE.mode === 'addon' ? STATE.existingCount : 0) +
@@ -444,6 +456,10 @@ function calculate() {
                             const months = parseMultiMonths(c.multiMonths);
                             srvPrice = Math.round(srvPriceYear / 12 * months);
                             monthsLabel = ` (${months} мес.)`;
+                        } else if (srv.key === 'lk') {
+                            const months = c.lkMonths || 12;
+                            srvPrice = Math.round(srvPriceYear / 12 * months);
+                            monthsLabel = months !== 12 ? ` (${months} мес.)` : '';
                         }
                         total += srvPrice;
                         logs.push(`      ${compName} - ${srv.label}${monthsLabel} | ${formatPrice(srvPrice)}`);
@@ -855,7 +871,7 @@ const CalcApp = {
         if (STATE.fastRows.length > 1) { STATE.fastRows = STATE.fastRows.filter(x => x.id != id); render(); }
     },
     addDetailedCompany: () => {
-        STATE.detailedCompanies.push({ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none', multiMonths: 12 });
+        STATE.detailedCompanies.push({ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none', multiMonths: 12, lkMonths: 12 });
         render();
     },
     updateDet: (id, f, v, redraw = true) => {
@@ -892,12 +908,207 @@ const CalcApp = {
         calculate();
     },
     updateSoloEmployees: (val) => {
-        const clean = val.toString().replace(/\D/g, '');
-        CalcApp.updateSolo('employees', clean === "" ? "" : parseInt(clean) || 0);
+        // устарело, оставлено для совместимости
     },
-    updateSoloMultiMonths: (val) => {
-        STATE.solo.multiMonths = val === '' ? 12 : val;
-        calculate();
+    toggleSoloOption: (field, value) => {
+        STATE.solo[field] = STATE.solo[field] === value ? 'none' : value;
+        if (field === 'lk' && STATE.solo[field] !== 'none') STATE.solo.multiUser = 'none';
+        if (field === 'multiUser' && STATE.solo[field] !== 'none') STATE.solo.lk = 'none';
+        render();
+    },
+    // ── Модал расчёта месяцев ────────────────────────────────────────────
+    _mc: { context: null, field: null, compId: null, months: null, price: null, variant: null, variantLabel: null },
+
+    openMonthsCalc(context, field, compId) {
+        CalcApp._mc = { context, field, compId: compId || null, months: null, price: null, variant: null, variantLabel: null };
+        const modal = document.getElementById('calc-months-modal');
+        if (!modal) return;
+
+        // Определяем варианты в зависимости от поля
+        const variants = field === 'lk'
+            ? [ { val: 'base', col: 'lk_base', label: 'ЛК Базовый' }, { val: 'prof', col: 'lk_prof', label: 'ЛК Проф' } ]
+            : [ { val: 'small', col: 'multi_small', label: 'МР 2–9' }, { val: 'large', col: 'multi_large', label: 'МР 10+' } ];
+        CalcApp._mc._variants = variants;
+        CalcApp._mc.variant = variants[0].val;
+        CalcApp._mc.variantLabel = variants[0].label;
+        CalcApp._mc._variantCol = variants[0].col;
+
+        // Заголовок
+        const subtitleEl = document.getElementById('calc-mc-subtitle');
+        if (subtitleEl) subtitleEl.textContent = field === 'lk' ? 'Личный кабинет' : 'Многопользовательский режим';
+
+        // Кнопки вариантов
+        const group = document.getElementById('calc-mc-variant-group');
+        if (group) {
+            group.innerHTML = '';
+            variants.forEach((v, i) => {
+                const btn = document.createElement('button');
+                btn.textContent = v.label;
+                btn.style.cssText = 'flex:1;border:2px solid transparent;padding:9px 10px;border-radius:10px;cursor:pointer;font-weight:600;font-family:Montserrat,sans-serif;font-size:13px;transition:all 0.2s;';
+                if (i === 0) {
+                    btn.style.background = '#FF5D5B'; btn.style.color = '#fff'; btn.style.borderColor = '#fff';
+                } else {
+                    btn.style.background = 'transparent'; btn.style.color = '#7f8c8d';
+                }
+                btn.onclick = () => {
+                    CalcApp._mc.variant = v.val;
+                    CalcApp._mc.variantLabel = v.label;
+                    CalcApp._mc._variantCol = v.col;
+                    group.querySelectorAll('button').forEach(b => {
+                        b.style.background = 'transparent'; b.style.color = '#7f8c8d'; b.style.borderColor = 'transparent';
+                    });
+                    btn.style.background = '#FF5D5B'; btn.style.color = '#fff'; btn.style.borderColor = '#fff';
+                    // Пересчитать если уже посчитано
+                    if (CalcApp._mc.months !== null) CalcApp._updateMcPrice();
+                };
+                group.appendChild(btn);
+            });
+        }
+
+        document.getElementById('calc-mc-license-end').value = '';
+        document.getElementById('calc-mc-connect-date').value = '';
+        document.getElementById('calc-mc-result').style.display = 'none';
+        document.getElementById('calc-mc-apply-btn').style.display = 'none';
+        modal.style.display = 'flex';
+    },
+
+    closeMonthsCalc() {
+        const modal = document.getElementById('calc-months-modal');
+        if (modal) modal.style.display = 'none';
+    },
+
+    _updateMcPrice() {
+        const mc = CalcApp._mc;
+        let tariff = null;
+        if (mc.context === 'solo') {
+            tariff = STATE.tariffMap[STATE.solo.region] || STATE.tariffs[0];
+        } else if (mc.context === 'det' && mc.compId) {
+            const comp = STATE.detailedCompanies.find(x => x.id == mc.compId);
+            tariff = (comp && STATE.tariffMap[comp.region]) || STATE.tariffs[0];
+        }
+        tariff = tariff || STATE.tariffs[0];
+        const colKey = mc._variantCol;
+        const yearPrice = tariff ? (parseInt(tariff[CONFIG.columns[colKey]]) || 0) : 0;
+        const months = mc.months;
+        const price = yearPrice > 0 && months > 0 ? Math.round(yearPrice / 12 * months) : null;
+        mc.price = price;
+
+        const priceEl = document.getElementById('calc-mc-price-val');
+        const formulaEl = document.getElementById('calc-mc-price-formula');
+        if (priceEl) {
+            if (price !== null && yearPrice > 0) {
+                priceEl.textContent = Math.round(price).toLocaleString('ru-RU') + ' ₽';
+                if (formulaEl) formulaEl.textContent = `${yearPrice.toLocaleString('ru-RU')} / 12 × ${months}`;
+            } else if (yearPrice === 0) {
+                priceEl.textContent = '—';
+                if (formulaEl) formulaEl.textContent = tariff ? 'нет цены для региона' : 'регион не выбран';
+            }
+        }
+        const applyBtn = document.getElementById('calc-mc-apply-btn');
+        if (applyBtn) applyBtn.style.display = (months > 0 ? 'block' : 'none');
+    },
+
+    calcMonths() {
+        const parseDate = (s) => {
+            s = (s || '').trim();
+            const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+            if (!m) return null;
+            const d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+            // Проверка валидности (напр. 31.02)
+            if (d.getFullYear() !== parseInt(m[3]) || d.getMonth() !== parseInt(m[2])-1 || d.getDate() !== parseInt(m[1])) return null;
+            return d;
+        };
+
+        // Добавить N месяцев к дате, с клэмпом до последнего дня месяца
+        const addMonths = (date, n) => {
+            const y = date.getFullYear(), mo = date.getMonth(), d = date.getDate();
+            const targetMo = mo + n;
+            const targetYear = y + Math.floor(targetMo / 12);
+            const targetMonth = ((targetMo % 12) + 12) % 12;
+            const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+            return new Date(targetYear, targetMonth, Math.min(d, lastDay));
+        };
+        const prevDay = d => new Date(d.getTime() - 86400000);
+
+        // N полных месяцев: addMonths(start, N) - 1 день <= end
+        const fullMonths = (start, end) => {
+            if (end < start) return 0;
+            let n = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+            while (n > 0 && prevDay(addMonths(start, n)) > end) n--;
+            return Math.max(0, n);
+        };
+
+        const endStr = document.getElementById('calc-mc-license-end').value;
+        const connectStr = document.getElementById('calc-mc-connect-date').value;
+        const licEnd = parseDate(endStr);
+        const connectDate = parseDate(connectStr);
+        const resultBox = document.getElementById('calc-mc-result');
+        const monthsVal = document.getElementById('calc-mc-months-val');
+        const explainEl = document.getElementById('calc-mc-explain');
+        const applyBtn = document.getElementById('calc-mc-apply-btn');
+
+        if (!licEnd || !connectDate) {
+            resultBox.style.display = 'block';
+            monthsVal.textContent = '—';
+            document.getElementById('calc-mc-price-val').textContent = '';
+            document.getElementById('calc-mc-price-formula').textContent = '';
+            explainEl.textContent = 'Проверьте формат дат (дд.мм.гггг)';
+            applyBtn.style.display = 'none';
+            CalcApp._mc.months = null;
+            return;
+        }
+        if (connectDate > licEnd) {
+            resultBox.style.display = 'block';
+            monthsVal.textContent = '0';
+            document.getElementById('calc-mc-price-val').textContent = '—';
+            document.getElementById('calc-mc-price-formula').textContent = '';
+            explainEl.textContent = 'Дата подключения позже окончания лицензии';
+            applyBtn.style.display = 'none';
+            CalcApp._mc.months = 0;
+            return;
+        }
+
+        const months = fullMonths(connectDate, licEnd);
+        CalcApp._mc.months = months;
+        CalcApp._mc._endStr = endStr;
+        CalcApp._mc._connectStr = connectStr;
+
+        const endOfStart = addMonths(connectDate, months);
+        monthsVal.textContent = months + ' мес.';
+        explainEl.textContent = `${connectStr} + ${months} мес. = ${endOfStart.getDate().toString().padStart(2,'0')}.${(endOfStart.getMonth()+1).toString().padStart(2,'0')}.${endOfStart.getFullYear()}`;
+        resultBox.style.display = 'block';
+
+        CalcApp._updateMcPrice();
+    },
+
+    applyMonths() {
+        const { context, field, compId, months, price, variantLabel, _variantCol, _endStr, _connectStr } = CalcApp._mc;
+        if (!months || months <= 0) return;
+
+        // Метка для детализации
+        const srvLabel = variantLabel || (field === 'lk' ? 'ЛК' : 'МР');
+        const detailLine = `${srvLabel} (${months} мес., ${_connectStr}–${_endStr}) | ${price !== null ? Math.round(price).toLocaleString('ru-RU') + ' ₽' : '—'}`;
+
+        if (context === 'solo') {
+            if (field === 'lk') {
+                const lkVal = CalcApp._mc.variant; // 'base' или 'prof'
+                STATE.solo.lk = lkVal;
+                STATE.solo.lkMonths = months;
+            }
+            if (field === 'multi') {
+                STATE.solo.multiUser = CalcApp._mc.variant; // 'small' или 'large'
+                STATE.solo.multiMonths = months;
+            }
+            render();
+        } else if (context === 'det' && compId) {
+            const comp = STATE.detailedCompanies.find(x => x.id == compId);
+            if (comp) {
+                if (field === 'lk') { comp.lk = CalcApp._mc.variant; comp.lkMonths = months; }
+                if (field === 'multi') { comp.multiUser = CalcApp._mc.variant; comp.multiMonths = months; }
+                render();
+            }
+        }
+        CalcApp.closeMonthsCalc();
     }
 };
 

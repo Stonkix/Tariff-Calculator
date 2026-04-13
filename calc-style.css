@@ -394,3 +394,27 @@
   border-radius: 12px;
   border-left: 4px solid #FF5D5B;
 }
+
+/* Кнопка + для открытия расчёта месяцев */
+.calc-months-hint-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: #FF5D5B;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.2s, transform 0.1s;
+}
+.calc-months-hint-btn:hover {
+  background: #e04a48;
+  transform: scale(1.15);
+}
