@@ -247,17 +247,15 @@
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
                 <div>
+                    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Начало лицензии</label>
+                    <input type="text" id="calc-mc-connect-date" placeholder="дд.мм.гггг"
+                        style="width:100%;padding:10px 12px;border:1px solid #e1e8ed;border-radius:10px;font-family:'Montserrat',sans-serif;font-size:13px;box-sizing:border-box;">
+                </div>
+                <div>
                     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Окончание лицензии</label>
                     <input type="text" id="calc-mc-license-end" placeholder="дд.мм.гггг"
                         style="width:100%;padding:10px 12px;border:1px solid #e1e8ed;border-radius:10px;font-family:'Montserrat',sans-serif;font-size:13px;box-sizing:border-box;">
                 </div>
-                <div>
-                    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Дата подключения</label>
-                    <input type="text" id="calc-mc-connect-date" placeholder="дд.мм.гггг"
-                        style="width:100%;padding:10px 12px;border:1px solid #e1e8ed;border-radius:10px;font-family:'Montserrat',sans-serif;font-size:13px;box-sizing:border-box;">
-                </div>
-            </div>
-
             <button onclick="CalcApp.calcMonths()" style="width:100%;padding:12px;background:#FF5D5B;color:#fff;border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:'Montserrat',sans-serif;margin-bottom:14px;">Рассчитать</button>
 
             <div id="calc-mc-result" style="display:none;background:#fff8f8;border-radius:12px;padding:14px 18px;margin-bottom:14px;border:1px solid rgba(255,93,91,0.15);">
