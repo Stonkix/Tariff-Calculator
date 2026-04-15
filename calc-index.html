@@ -234,7 +234,7 @@
 
     <!-- Модальное окно расчёта месяцев -->
     <div id="calc-months-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9999; align-items:center; justify-content:center;">
-        <div style="background:#fff; border-radius:20px; padding:28px 28px 24px; max-width:440px; width:92%; box-shadow:0 20px 60px rgba(0,0,0,0.2); font-family:'Montserrat',sans-serif; position:relative; max-height:90vh; overflow-y:auto;">
+        <div style="background:#fff; border-radius:20px; padding:28px 28px 24px; max-width:480px; width:92%; box-shadow:0 20px 60px rgba(0,0,0,0.2); font-family:'Montserrat',sans-serif; position:relative; max-height:90vh; overflow-y:auto;">
             <button onclick="CalcApp.closeMonthsCalc()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#aaa;line-height:1;">×</button>
             <div style="font-weight:800;font-size:16px;color:#FF5D5B;margin-bottom:4px;">Расчёт стоимости расширения</div>
             <div id="calc-mc-subtitle" style="font-size:12px;color:#999;margin-bottom:18px;font-weight:600;"></div>
@@ -243,6 +243,15 @@
             <div id="calc-mc-variant-row" style="margin-bottom:16px;">
                 <label style="display:block;font-weight:600;font-size:12px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Вариант</label>
                 <div id="calc-mc-variant-group" style="display:flex;background:#f1f3f5;padding:5px;border-radius:14px;gap:5px;"></div>
+            </div>
+
+            <!-- Переключатель Группа компаний (только для ЛК) -->
+            <div id="calc-mc-gk-row" style="display:none;margin-bottom:16px;">
+                <label style="display:block;font-weight:600;font-size:12px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Группа компаний?</label>
+                <div style="display:flex;background:#f1f3f5;padding:5px;border-radius:14px;gap:5px;">
+                    <button class="calc-mc-gk-btn" data-val="no" style="flex:1;border:2px solid transparent;padding:9px 10px;border-radius:10px;cursor:pointer;font-weight:600;font-family:Montserrat,sans-serif;font-size:13px;transition:all 0.2s;background:#FF5D5B;color:#fff;border-color:#fff;">Нет</button>
+                    <button class="calc-mc-gk-btn" data-val="yes" style="flex:1;border:2px solid transparent;padding:9px 10px;border-radius:10px;cursor:pointer;font-weight:600;font-family:Montserrat,sans-serif;font-size:13px;transition:all 0.2s;background:transparent;color:#7f8c8d;">Да</button>
+                </div>
             </div>
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
@@ -256,21 +265,22 @@
                     <input type="text" id="calc-mc-license-end" placeholder="дд.мм.гггг"
                         style="width:100%;padding:10px 12px;border:1px solid #e1e8ed;border-radius:10px;font-family:'Montserrat',sans-serif;font-size:13px;box-sizing:border-box;">
                 </div>
+            </div>
             <button onclick="CalcApp.calcMonths()" style="width:100%;padding:12px;background:#FF5D5B;color:#fff;border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:'Montserrat',sans-serif;margin-bottom:14px;">Рассчитать</button>
 
-            <div id="calc-mc-result" style="display:none;background:#fff8f8;border-radius:12px;padding:14px 18px;margin-bottom:14px;border:1px solid rgba(255,93,91,0.15);">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-                    <div>
+            <div id="calc-mc-result" style="display:none;background:#fff8f8;border-radius:12px;padding:16px 20px;margin-bottom:14px;border:1px solid rgba(255,93,91,0.15);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+                    <div style="min-width:90px;">
                         <div style="font-size:11px;color:#999;margin-bottom:2px;">Месяцев</div>
-                        <div id="calc-mc-months-val" style="font-size:26px;font-weight:800;color:#FF5D5B;"></div>
+                        <div id="calc-mc-months-val" style="font-size:28px;font-weight:800;color:#FF5D5B;white-space:nowrap;"></div>
                     </div>
-                    <div style="text-align:right;">
+                    <div style="text-align:right;min-width:110px;">
                         <div style="font-size:11px;color:#999;margin-bottom:2px;">Стоимость</div>
-                        <div id="calc-mc-price-val" style="font-size:26px;font-weight:800;color:#333;"></div>
-                        <div id="calc-mc-price-formula" style="font-size:10px;color:#bbb;margin-top:2px;"></div>
+                        <div id="calc-mc-price-val" style="font-size:28px;font-weight:800;color:#333;white-space:nowrap;"></div>
+                        <div id="calc-mc-price-formula" style="font-size:10px;color:#bbb;margin-top:2px;white-space:nowrap;"></div>
                     </div>
                 </div>
-                <div id="calc-mc-explain" style="font-size:11px;color:#999;margin-top:8px;border-top:1px solid #f0e0e0;padding-top:8px;"></div>
+                <div id="calc-mc-explain" style="font-size:11px;color:#999;margin-top:8px;border-top:1px solid #f0e0e0;padding-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
             </div>
 
             <button id="calc-mc-apply-btn" onclick="CalcApp.applyMonths()" style="width:100%;padding:12px;background:#27ae60;color:#fff;border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:'Montserrat',sans-serif;display:none;margin-bottom:10px;">Применить к расчёту</button>
