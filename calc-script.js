@@ -181,6 +181,9 @@ function setupEventListeners() {
             groupBtns.forEach(b => b.classList.remove('calc-selected'));
             e.target.classList.add('calc-selected');
             STATE.isGroup = e.target.dataset.value === 'yes';
+            if (STATE.isGroup) {
+                STATE.detailedCompanies.forEach(c => { c.lkGroup = true; });
+            }
             const container = document.getElementById('calc-mode-selection-container');
             if (container) container.style.display = STATE.isGroup ? 'block' : 'none';
             render();
@@ -302,13 +305,11 @@ function renderDetailedMode(container, showExisting) {
 
         const lkHintBtn = cardContent.querySelector('.calc-months-hint-card-lk');
         if (lkHintBtn) {
-            if (STATE.isGroup) lkHintBtn.style.display = 'none';
-            else lkHintBtn.onclick = () => CalcApp.openMonthsCalc('det', 'lk', comp.id);
+            lkHintBtn.onclick = () => CalcApp.openMonthsCalc('det', 'lk', comp.id);
         }
         const multiHintBtn = cardContent.querySelector('.calc-months-hint-card-multi');
         if (multiHintBtn) {
-            if (STATE.isGroup) multiHintBtn.style.display = 'none';
-            else multiHintBtn.onclick = () => CalcApp.openMonthsCalc('det', 'multi', comp.id);
+            multiHintBtn.onclick = () => CalcApp.openMonthsCalc('det', 'multi', comp.id);
         }
 
         // Поле месяцев МР — только вне ГК режима
@@ -460,7 +461,8 @@ function calculate() {
                 total += pGK; discCurrentTotal += pGK; discBaseTotal += pBase;
                 CONFIG.extraServices.forEach(srv => {
                     if (c[srv.key] === srv.val) {
-                        const colKey = (srv.key === 'lk' && !c.lkGroup && srv.colNoGk) ? srv.colNoGk : srv.col;
+                        const useGroupLk = STATE.isGroup || !!c.lkGroup;
+                        const colKey = (srv.key === 'lk' && !useGroupLk && srv.colNoGk) ? srv.colNoGk : srv.col;
                         const srvPriceYear = getPrice(t, colKey);
                         let srvPrice = srvPriceYear;
                         let monthsLabel = '';
@@ -924,7 +926,7 @@ const CalcApp = {
         if (STATE.fastRows.length > 1) { STATE.fastRows = STATE.fastRows.filter(x => x.id != id); render(); }
     },
     addDetailedCompany: () => {
-        STATE.detailedCompanies.push({ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none', multiMonths: 12, lkMonths: 12, lkGroup: false });
+        STATE.detailedCompanies.push({ id: Date.now(), name: '', inn: '', region: '', ownership: 'ul', lk: 'none', multiUser: 'none', multiMonths: 12, lkMonths: 12, lkGroup: STATE.isGroup });
         render();
     },
     updateDet: (id, f, v, redraw = true) => {
@@ -939,6 +941,7 @@ const CalcApp = {
         const c = STATE.detailedCompanies.find(x => x.id == id);
         if (!c) return;
         c[field] = c[field] === value ? 'none' : value;
+        if (field === 'lk' && c[field] !== 'none' && STATE.isGroup) c.lkGroup = true;
         if (field === 'lk' && c[field] !== 'none') c.multiUser = 'none';
         if (field === 'multiUser' && c[field] !== 'none') c.lk = 'none';
         render();
@@ -982,6 +985,7 @@ const CalcApp = {
                 const comp = STATE.detailedCompanies.find(x => x.id == compId);
                 if (comp) CalcApp._mc.lkGroup = !!comp.lkGroup;
             }
+            if (STATE.isGroup) CalcApp._mc.lkGroup = true;
         }
 
         const modal = document.getElementById('calc-months-modal');
@@ -1046,6 +1050,7 @@ const CalcApp = {
                         b.style.background = '#FF5D5B'; b.style.color = '#fff'; b.style.borderColor = '#fff';
                     }
                     b.onclick = () => {
+                        if (STATE.isGroup) return;
                         CalcApp._mc.lkGroup = b.dataset.val === 'yes';
                         // Обновить колонки в вариантах
                         const vars = getVariants();
@@ -1090,7 +1095,8 @@ const CalcApp = {
         const colKey = mc._variantCol;
         const yearPrice = tariff ? (parseInt(tariff[CONFIG.columns[colKey]]) || 0) : 0;
         const months = mc.months;
-        const price = yearPrice > 0 && months > 0 ? Math.round(yearPrice / 12 * months) : null;
+        const chargeMonths = months === null ? null : Math.max(1, months);
+        const price = yearPrice > 0 && chargeMonths !== null ? Math.round(yearPrice / 12 * chargeMonths) : null;
         mc.price = price;
 
         const priceEl = document.getElementById('calc-mc-price-val');
@@ -1098,14 +1104,14 @@ const CalcApp = {
         if (priceEl) {
             if (price !== null && yearPrice > 0) {
                 priceEl.textContent = Math.round(price).toLocaleString('ru-RU') + ' ₽';
-                if (formulaEl) formulaEl.textContent = `${yearPrice.toLocaleString('ru-RU')} / 12 × ${months}`;
+                if (formulaEl) formulaEl.textContent = `${yearPrice.toLocaleString('ru-RU')} / 12 × ${chargeMonths}`;
             } else if (yearPrice === 0) {
                 priceEl.textContent = '—';
                 if (formulaEl) formulaEl.textContent = tariff ? 'нет цены для региона' : 'регион не выбран';
             }
         }
         const applyBtn = document.getElementById('calc-mc-apply-btn');
-        if (applyBtn) applyBtn.style.display = (months > 0 ? 'block' : 'none');
+        if (applyBtn) applyBtn.style.display = (months !== null ? 'block' : 'none');
     },
 
     calcMonths() {
@@ -1159,12 +1165,12 @@ const CalcApp = {
         }
         if (connectDate > licEnd) {
             resultBox.style.display = 'block';
-            monthsVal.textContent = '0';
-            document.getElementById('calc-mc-price-val').textContent = '—';
-            document.getElementById('calc-mc-price-formula').textContent = '';
+            monthsVal.textContent = '0 мес. (к оплате 1 мес.)';
             explainEl.textContent = 'Дата подключения позже окончания лицензии';
-            applyBtn.style.display = 'none';
+            CalcApp._mc._endStr = endStr;
+            CalcApp._mc._connectStr = connectStr;
             CalcApp._mc.months = 0;
+            CalcApp._updateMcPrice();
             return;
         }
 
@@ -1183,29 +1189,30 @@ const CalcApp = {
 
     applyMonths() {
         const { context, field, compId, months, price, variantLabel, _variantCol, _endStr, _connectStr } = CalcApp._mc;
-        if (!months || months <= 0) return;
+        if (months === null || months === undefined) return;
+        const appliedMonths = Math.max(1, months);
 
         // Метка для детализации
         const srvLabel = variantLabel || (field === 'lk' ? 'ЛК' : 'МР');
-        const detailLine = `${srvLabel} (${months} мес., ${_connectStr}–${_endStr}) | ${price !== null ? Math.round(price).toLocaleString('ru-RU') + ' ₽' : '—'}`;
+        const detailLine = `${srvLabel} (${appliedMonths} мес., ${_connectStr}–${_endStr}) | ${price !== null ? Math.round(price).toLocaleString('ru-RU') + ' ₽' : '—'}`;
 
         if (context === 'solo') {
             if (field === 'lk') {
                 const lkVal = CalcApp._mc.variant; // 'base' или 'prof'
                 STATE.solo.lk = lkVal;
-                STATE.solo.lkMonths = months;
+                STATE.solo.lkMonths = appliedMonths;
                 STATE.solo.lkGroup = !!CalcApp._mc.lkGroup;
             }
             if (field === 'multi') {
                 STATE.solo.multiUser = CalcApp._mc.variant; // 'small' или 'large'
-                STATE.solo.multiMonths = months;
+                STATE.solo.multiMonths = appliedMonths;
             }
             render();
         } else if (context === 'det' && compId) {
             const comp = STATE.detailedCompanies.find(x => x.id == compId);
             if (comp) {
-                if (field === 'lk') { comp.lk = CalcApp._mc.variant; comp.lkMonths = months; comp.lkGroup = !!CalcApp._mc.lkGroup; }
-                if (field === 'multi') { comp.multiUser = CalcApp._mc.variant; comp.multiMonths = months; }
+                if (field === 'lk') { comp.lk = CalcApp._mc.variant; comp.lkMonths = appliedMonths; comp.lkGroup = !!CalcApp._mc.lkGroup; }
+                if (field === 'multi') { comp.multiUser = CalcApp._mc.variant; comp.multiMonths = appliedMonths; }
                 render();
             }
         }
